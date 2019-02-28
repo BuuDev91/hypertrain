@@ -5,6 +5,8 @@ import numpy as np
 import time
 import datetime
 import cv2
+import sys
+
 
 from imutils.video.pivideostream import PiVideoStream
 from imutils.video import FPS
@@ -20,27 +22,29 @@ time.sleep(2)
 fps = FPS().start()
 
 # define range HSV for white color of the sign
-sensitivity = 30
-lower_white_color = np.array([0, 0, 255-sensitivity])
-upper_white_color = np.array([255, sensitivity, 255])
+sensitivity = 40
+lower_white_color = np.array([0, 5, 200])
+upper_white_color = np.array([180, 255, 255])
+
 lower_black_color = np.array([0, 0, 0])
-upper_black_color = np.array([50, 50, sensitivity])
-lower_blue_color = np.array([120-sensitivity,50,50])
-upper_blue_color = np.array([120+sensitivity,255,255])
+upper_black_color = np.array([180, 255, sensitivity])
+
+lower_blue_color = np.array([100,225,100])
+upper_blue_color = np.array([120,255,255])
 
 def analyzeArea(image, warped):
 		
-	amountOfBlue = getAmountOfBlue(warped)
-	if (amountOfBlue > 0.1):
+	if (getAmountOfColor(warped, lower_blue_color, upper_blue_color) > 0.03): #tbd
 		cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
 		print(datetime.datetime.now().strftime("%H:%M:%S") + ": " + "Rundensignal")
-	else:
+	elif (getAmountOfColor(warped, lower_black_color, upper_black_color) > 0.1):
 		#optimized = warped[50:450, 50:450]
-		cropValue = 3
-		optimized = cv2.resize(warped, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
+		cropValue = 2
+		optimized = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+		optimized = cv2.resize(optimized, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
 		optimized = optimized[cropValue:optimized.shape[1] - cropValue, cropValue:optimized.shape[0] - cropValue]
-		optimized = cv2.GaussianBlur(optimized, (5, 5), 0)
-		optimized = cv2.adaptiveThreshold(cv2.cvtColor(optimized, cv2.COLOR_BGR2GRAY), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2)
+		#optimized = cv2.GaussianBlur(optimized, (5, 5), 0)
+		#optimized = cv2.adaptiveThreshold(optimized, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2)
 		
 		cv2.imshow("optimized", optimized)
 
@@ -58,42 +62,56 @@ def analyzeArea(image, warped):
 			print(datetime.datetime.now().strftime("%H:%M:%S") + ": " + result_txt)
 			cv2.putText(image, str(result_txt), (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
 
-def getAmountOfBlue(img):
-	rgbSensitivity = int(sensitivity*1.5)
-	blue = [rgbSensitivity, rgbSensitivity, 255-rgbSensitivity]  # RGB
-	boundaries = [([blue[2]-rgbSensitivity, blue[1]-rgbSensitivity, blue[0]-rgbSensitivity],
-				[blue[2]+rgbSensitivity, blue[1]+rgbSensitivity, blue[0]+rgbSensitivity])]
-	# in order BGR as opencv represents images as numpy arrays in reverse order
+def getAmountOfColor(img, lowerColor, upperColor):
+	img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+	maskColor = cv2.inRange(img, lowerColor, upperColor)
+	ratio_blue = cv2.countNonZero(maskColor)/(img.size/3)
 
-	for (lower, upper) in boundaries:
-		lower = np.array(lower, dtype=np.uint8)
-		upper = np.array(upper, dtype=np.uint8)
-		mask = cv2.inRange(img, lower, upper)
-		ratio_blue = cv2.countNonZero(mask)/(img.size/3)
-
+	#print("Ratio: " + str(ratio_blue))
 	return ratio_blue
+
+def pick_color(event,x,y,flags,param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        pixel = hsv[y,x]
+
+        upper =  np.array([pixel[0], pixel[1], pixel[2]])
+        lower =  np.array([pixel[0], pixel[1], pixel[2]])
+        print(lower, upper)
+
+        image_mask = cv2.inRange(hsv,lower,upper)
+        cv2.imshow("mask",image_mask)
+
+global hsv, pixel
  
 # capture frames from the camera
 while True:
+
 	image = vs.read()
 	image = imutils.rotate(image, angle=180)
 
 	frameArea = image.shape[0]*image.shape[1]
 	
+	#blurred = cv2.GaussianBlur(image, (11, 11), 0)
 	# convert color image to HSV color scheme
 	hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-	# define kernel for smoothing   
-	kernel = np.ones((3,3),np.uint8)
-
+	cv2.namedWindow('hsv')
+	cv2.setMouseCallback('hsv', pick_color)
+	cv2.imshow("hsv", hsv)
+	
 	# extract binary image with defined color regions
 	maskWhite = cv2.inRange(hsv, lower_white_color, upper_white_color)
 	maskBlack = cv2.inRange(hsv, lower_black_color, upper_black_color)
 	maskBlue = cv2.inRange(hsv, lower_blue_color, upper_blue_color)
 
-	mask = cv2.bitwise_or(maskWhite, maskBlue)
-	#mask = cv2.bitwise_or(mask, maskBlack)
+	mask = cv2.bitwise_or(maskBlack, maskBlue)
+	mask = cv2.bitwise_or(mask, maskWhite)
 
+	#mask = cv2.erode(mask, None, iterations=2)
+	#mask = cv2.dilate(mask, None, iterations=2)
+
+	# define kernel for smoothing   
+	kernel = np.ones((3,3),np.uint8)
 	# morphological operations
 	mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 	mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
@@ -102,12 +120,6 @@ while True:
 	# find contours in the mask
 	cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 
-	# define variables to hold values during loop
-	largestArea = 0
-	largestRect = None
-	largestAngle = 0
-	sideRatio = 0
-	
 	# only proceed if at least one contour was found
 	if len(cnts) > 0:
 		for cnt in cnts:
@@ -125,21 +137,15 @@ while True:
 				area = sideOne*sideTwo
 				sideRatio = sideOne / sideTwo
 
+				#cv2.drawContours(image,[box],0,(0,255,0),2)
+
 				# find all contours looking like a signal
 				#if area > largestArea and sideRatio >= 0.8 and sideRatio <= 1.2:
 				if area > 500 and sideRatio >= 0.8 and sideRatio <= 1.2:
+					print("Area: " + str(area))
 					cv2.drawContours(image,[box],0,(0,255,0),2)
-					
 					warped = four_point_transform(image, [box][0])
 					analyzeArea(image, warped)
-
-		
-	if False and largestArea > frameArea*0.001:
-		# draw contour of the found rectangle on  the original image   
-		cv2.drawContours(image,[largestRect],0,(0,0,255),2)
-
-		warped = four_point_transform(image, [largestRect][0])
-		analyzeArea(image, warped)
 
 	cv2.imshow("image", image)
 
