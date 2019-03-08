@@ -1,48 +1,53 @@
 # import the necessary packages
 import numpy as np
-import time
+
 import datetime
 import cv2
 import sys
 import imutils
 
-from imutils.video.pivideostream import PiVideoStream
-from imutils.video import FPS
+from logger import Logger
+
 from imutils.perspective import four_point_transform
 from imutils import contours
 from tesserocr import PyTessBaseAPI, PSM
 from PIL import Image
- 
-vs = PiVideoStream(resolution=(480, 368), framerate=32).start()
-time.sleep(2)
-fps = FPS().start()
 
-# define range HSV for white color of the sign
+logger = Logger()
+
+# define color boundaries
 lower_white_color = np.array([0, 15, 100])
 upper_white_color = np.array([180, 255, 255])
 
 lower_black_color = np.array([0, 0, 0])
 upper_black_color = np.array([180, 255, 40])
 
-lower_blue_color = np.array([100,200,0])
-upper_blue_color = np.array([120,255,255])
+lower_blue_color = np.array([100,200,30])
+upper_blue_color = np.array([120,255,160])
 
-KNOWN_WIDTH = 4.5
-KNOWN_DISTANCE = 50.0
-FOCAL_LENGTH = 0
+# known dimensions of the sign for calibration purposes
+KNOWN_WIDTH = 43
+KNOWN_DISTANCE = 150
+FOCAL_LENGTH = 600
+
+global hsv, pixel
 
 def analyzeArea(image, warped, box):
-
-	FOCAL_LENGTH = 3040.0 #calibrate: (box[1][0] * KNOWN_DISTANCE) / KNOWN_WIDTH
-	#print ("Focal length: " + str(FOCAL_LENGTH))
-
-	if (box[1][0] > 0.0):
-		DISTANCE = (KNOWN_WIDTH * FOCAL_LENGTH) / float(box[1][0])
-		#print ("Distance: " + str(DISTANCE))
 	
 	# find amount of color black in warped area, assuming over X% is a numeric signal
 	if (getAmountOfColor(warped, lower_black_color, upper_black_color) > 0.4):
-		print ("amount of black: " + str(getAmountOfColor(warped, lower_black_color, upper_black_color)))
+		#print ("amount of black: " + str(getAmountOfColor(warped, lower_black_color, upper_black_color)))
+
+		#PIXEL_WIDTH = box[0][1]
+
+		# FOCAL_LENGTH must be calibrated before the distance to the known object can be determined
+		#FOCAL_LENGTH = (PIXEL_WIDTH * KNOWN_DISTANCE) / KNOWN_WIDTH
+		#print ("Focal length: " + str(FOCAL_LENGTH))
+
+		#if (PIXEL_WIDTH > 0.0):
+			#print ("Px: " + str(PIXEL_WIDTH))
+			#DISTANCE = (KNOWN_WIDTH * FOCAL_LENGTH) / PIXEL_WIDTH
+			#print ("Distance: " + str(DISTANCE))
 
 		# cropValue: amount of the frame to be cropped out
 		cropValue = 10
@@ -63,14 +68,14 @@ def analyzeArea(image, warped, box):
 		result_txt = result_txt.replace("\n", "")
 		result_txt = result_txt.replace(" ", "")
 		if result_txt.isdigit() and int(result_txt) < 5:
-			print(datetime.datetime.now().strftime("%H:%M:%S") + ": " + result_txt)
+			logger.info("OCR: :" + result_txt)
 			cv2.putText(image, str(result_txt), (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
 
 	# find amount of color blue in warped area, assuming over X% is the lap signal
-	elif (getAmountOfColor(warped, lower_blue_color, upper_blue_color) > 0.2):
-		print ("amount of blue: " + str(getAmountOfColor(warped, lower_blue_color, upper_blue_color)))
+	elif (getAmountOfColor(warped, lower_blue_color, upper_blue_color) > 0.1):
+		#print ("amount of blue: " + str(getAmountOfColor(warped, lower_blue_color, upper_blue_color)))
 		cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
-		print(datetime.datetime.now().strftime("%H:%M:%S") + ": " + "Rundensignal")
+		logger.info("Rundensignal")
 
 def getAmountOfColor(img, lowerColor, upperColor, convert2hsv = True):
 	if (convert2hsv):
@@ -85,19 +90,15 @@ def getAmountOfColor(img, lowerColor, upperColor, convert2hsv = True):
 def pick_color(event,x,y,flags,param):
     if event == cv2.EVENT_LBUTTONDOWN:
         pixel = hsv[y,x]
-
         color =  np.array([pixel[0], pixel[1], pixel[2]])
         print(color)
 
-global hsv, pixel
  
 # capture frames from the camera
-while True:
+def capture(vs):
 	image = vs.read()
 	image = imutils.rotate(image, angle=180)
 
-	frameArea = image.shape[0]*image.shape[1]
-	
 	# convert color image to HSV color scheme
 	hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
@@ -151,21 +152,15 @@ while True:
 				sideOne = np.linalg.norm(box[0]-box[1])
 				sideTwo = np.linalg.norm(box[0]-box[3])
 
-				# count area of the rectangle
+				# calculate area of the rectangle
 				area = sideOne*sideTwo
 				sideRatio = sideOne / sideTwo
 
 				# find all contours looking like a signal with minimum area
 				if area > 750 and sideRatio >= 0.8 and sideRatio <= 1.2:
-					print("Area: " + str(area) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
+					logger.debug("Area: " + str(area) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
 					cv2.drawContours(image,[box],0,(0,255,0),1)
 					warped = four_point_transform(image, [box][0])
 					analyzeArea(image, warped, box)
 
 	cv2.imshow("image", image)
-
-	key = cv2.waitKey(1) & 0xFF
- 
-	# if the `q` key was pressed, break from the loop
-	if key == ord("q"):
-		break
