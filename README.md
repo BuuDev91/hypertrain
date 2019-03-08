@@ -10,14 +10,21 @@ Install X-Ming to be able to see image output (causes exceptions if not installe
 https://sourceforge.net/projects/xming/
 
 Putty Settings:
+
 hypertrain.local:22
+
 Connections / SSH / Enable X11 forwarding = True
 
 Login: pi // raspberry
+
 Hostname: hypertrain
 
 On login, execute following commands to start :
+
 > source ~/.profile
+
 > workon cv
+
 > cd hypertrain
+
 > python hypertrain.py
