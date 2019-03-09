@@ -14,7 +14,6 @@ class Logger:
             return id(self)
           
         def createLogFile(self, directory, filename):
-            print(directory)
             if not directory:
                 directory = os.getcwd()
                 
@@ -25,7 +24,6 @@ class Logger:
                 os.mkdir(directory)
 
             fullpath = os.path.join(directory, filename)
-            print(fullpath)
             logFile = codecs.open(fullpath, "a", "utf-8", buffering=0)
             return logFile 
         
