@@ -24,20 +24,18 @@ class Logger:
                 os.mkdir(directory)
 
             fullpath = os.path.join(directory, filename)
-            logFile = codecs.open(fullpath, "a", "utf-8", buffering=0)
+            logFile = codecs.open(fullpath, "a+", "utf-8", buffering=0)
             return logFile 
         
         def setLogLevel(self, level="info"):
             self.__logLevel = Logger.logLevels.index(level)
         
         def log(self, msg, level=2):
-            if level > self.__logLevel:
-                return
-            
             timeStr = time.strftime(Logger.timeFormat)
             levelStr = Logger.logLevels[level].upper()
             out = "%s [%s] %s" %(timeStr, levelStr, msg)
-            print(out)
+            if level == self.__logLevel:
+                print(out)
             self.__logFile.write(out)
             self.__logFile.write('\n')
         

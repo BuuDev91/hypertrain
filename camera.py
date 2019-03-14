@@ -20,8 +20,8 @@ class Colors:
     lower_black_color = np.array([0, 0, 0])
     upper_black_color = np.array([180, 255, 40])
 
-    lower_blue_color = np.array([100,200,30])
-    upper_blue_color = np.array([120,255,160])
+    lower_blue_color = np.array([100,150,100])
+    upper_blue_color = np.array([120,255,255])
 
 class Camera:
     class __impl:
@@ -31,8 +31,6 @@ class Camera:
             self.__vs = vs
         
         def analyzeArea(self, image, warped, box):
-            self.logger.debug("Amount of Blue: " + str(self.getAmountOfColor(warped, Colors.lower_blue_color, Colors.upper_blue_color)))
-
             # find amount of color black in warped area, assuming over X% is a numeric signal
             if (self.getAmountOfColor(warped, Colors.lower_black_color, Colors.upper_black_color) > 0.4):
                 self.logger.debug("Amount of Black: " + str(self.getAmountOfColor(warped, Colors.lower_black_color, Colors.upper_black_color)))
@@ -68,17 +66,17 @@ class Camera:
             if (convert2hsv):
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
             maskColor = cv2.inRange(img, lowerColor, upperColor)
-            ratio_blue = cv2.countNonZero(maskColor)/(img.size/2)
+            ratio_color = cv2.countNonZero(maskColor)/(img.size/2)
 
-            #print("Ratio: " + str(ratio_blue))
-            return ratio_blue
+            self.logger.debug("Ratio Color: " + str(ratio_color))
+            return ratio_color
 
         #color picker for manual debugging color HSV range
         def pick_color(self, event,x,y,flags,param):
             if event == cv2.EVENT_LBUTTONDOWN:
                 pixel = hsv[y,x]
                 color =  np.array([pixel[0], pixel[1], pixel[2]])
-                print(color)
+                self.logger.info(color)
 
         
         # capture frames from the camera
@@ -103,6 +101,9 @@ class Camera:
             # combine color masks bitwise or
             mask = cv2.bitwise_or(maskBlack, maskBlue)
             mask = cv2.bitwise_or(mask, maskWhite)
+
+            #grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            mask = cv2.adaptiveThreshold(mask, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
             # erode and dilate masks, smoothing
             mask = cv2.erode(mask, None, iterations=2)
@@ -133,7 +134,7 @@ class Camera:
                     # approximate shape, if it has a length of 4 we assume its a rectangle
                     approx = cv2.approxPolyDP(cnt, 0.04 * cv2.arcLength(cnt, True), True)
                     # the rectangle must not have a too big rotation (+/-30°)
-                    if len(approx) == 4: #and angle and (angle >= -90 and angle <= -80 or angle >= -10):
+                    if len(approx) == 4 and angle and (angle >= -90 and angle <= -80 or angle >= -10):
                         box = cv2.boxPoints(rect)
                         box = np.int0(box)
 

@@ -14,9 +14,8 @@ camera = Camera(vs)
 time.sleep(1)
 
 logger = Logger()
-logger.setLogLevel('debug')
+logger.setLogLevel('info')
 logger.info('Started')
-
 
 # program loop
 while True:
@@ -27,3 +26,5 @@ while True:
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         break
+
+logger.info('Stopped')
