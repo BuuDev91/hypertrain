@@ -1,0 +1,9 @@
+Von Arduino:
+- Start = start
+- Last aufgenommen = loaded
+- Stop = stop
+
+Zu Arduino:
+- Beschleunigung = acceleration X%
+- Haltesignal erkannt = approachingstop
+- 

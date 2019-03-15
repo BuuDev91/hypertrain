@@ -1,0 +1,5 @@
+{
+  "sender": "raspberry",
+  "action": "acceleration",
+  "payload": 75
+}
