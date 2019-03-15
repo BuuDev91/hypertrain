@@ -34,7 +34,7 @@ class Logger:
             timeStr = time.strftime(Logger.timeFormat)
             levelStr = Logger.logLevels[level].upper()
             out = "%s [%s] %s" %(timeStr, levelStr, msg)
-            if level == self.__logLevel:
+            if level <= self.__logLevel:
                 print(out)
             self.__logFile.write(out)
             self.__logFile.write('\n')
