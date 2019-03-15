@@ -4,7 +4,7 @@
 ### Instructions:
 Pull Raspberry Image from here: https://drive.google.com/drive/folders/1YQowDY1B15QcnUpEM-oBepjDDtdwZNe5?usp=sharing
 comes with precompiled sources & dependencies:\
-Python 3.5.3, OpenCV 2, imutils, numpy, scipy, matplotlib
+Python 3.5.3, OpenCV 3.4.3, imutils, numpy, scipy, matplotlib
 
 Further dependencies have to be installed to use i2c bus:
 > sudo apt-get install build-essential libi2c-dev i2c-tools python-dev libffi-dev
