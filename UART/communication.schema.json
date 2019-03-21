@@ -14,7 +14,7 @@
         "start",
         "loaded",
         "approachstop",
-        "acceleration",
+        "accelerate",
 		"stopped"
       ]
     },
@@ -22,6 +22,7 @@
   },
   "required": [
     "sender",
-    "action"
+    "action",
+	"payload"
   ]
 }

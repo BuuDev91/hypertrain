@@ -1,9 +1,20 @@
 import serial
-               
+import json
+
+from enum import Enum
+
+from state import State
+
+# deserialized JSON Object
+class JSONObject(object):
+    def __init__(self, j):
+        self.__dict__ = json.loads(j)
+
 class Communication:
     class __impl:
         def __init__(self, logger):
             self.logger = logger
+            self.state = State()
             self.serial = serial.Serial(            
                             port='/dev/serial0',
                             baudrate = 9600,
@@ -18,11 +29,24 @@ class Communication:
             if (self.serial.inWaiting() > 0):
                 incoming = self.serial.read(self.serial.inWaiting()).decode('ascii')
                 self.logger.info("Receiving: " + incoming)
-            return incoming
+
+                json = None
+                try:
+                    json = JSONObject(incoming)
+                    if (json.sender == "arduino"):
+                        if (json.action == "start"):
+                            self.state.setStopped(False)
+                        elif (json.action == "loaded"):
+                            self.state.Loaded = True
+                        elif (json.action == "stopped"):
+                            self.state.setStopped(True)
+
+                except AttributeError:
+                    self.logger.error("AttributeError in JSON")
         
         def write(self, message):
             if (message):
-                self.logger.info("Sending: " + message)
+                self.logger.debug("Sending: " + message)
                 self.serial.write(message.encode())
     
     # Singleton 

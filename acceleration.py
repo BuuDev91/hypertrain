@@ -1,6 +1,8 @@
 #MMA8452Q i2c
 import smbus
 
+from state import State
+
 class Acceleration:
     class __impl:
         def __init__(self, logger):
@@ -10,6 +12,8 @@ class Acceleration:
             self.y = 0.0
             self.z = 0.0
             self.busReady = True
+            self.state = State()
+            
             try:
                 self.__initBus__()
             except:
@@ -17,6 +21,7 @@ class Acceleration:
                 self.logger.error("i2c bus connection could not be established")
             
         def __initBus__(self):
+            self.bus = smbus.SMBus(1)
             # MMA8452Q address, 0x1C(28)
             # Select Control register, 0x2A(42)
             #		0x00(00)	StandBy mode
@@ -55,6 +60,10 @@ class Acceleration:
 
                 self.logger.debug("Acceleration [X: %d - Y: %d - Z: %d]" %self.x %self.y %self.z)
 
+            self.state.x = self.x
+            self.state.y = self.y
+            self.state.z = self.z
+            
             return [self.x, self.y, self.z]
 
     # SINGLETON EVERYTHING :D

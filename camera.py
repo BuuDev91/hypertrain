@@ -6,22 +6,24 @@ import sys
 import imutils
 
 from logger import Logger
+from state import State, Signal
 
 from imutils.perspective import four_point_transform
 from imutils import contours
 from tesserocr import PyTessBaseAPI, PSM
 from PIL import Image
 
+
 class Colors:
     # define color boundaries
     lower_white_color = np.array([0, 15, 0])
     upper_white_color = np.array([180, 70, 255])
 
-    lower_black_color = np.array([0, 0, 0])
-    upper_black_color = np.array([180, 255, 40])
+    lower_black_color = np.array([100, 0, 0])
+    upper_black_color = np.array([180, 255, 60])
 
-    lower_blue_color = np.array([100, 150, 100])
-    upper_blue_color = np.array([120, 255, 255])
+    lower_blue_color = np.array([90, 150, 100])
+    upper_blue_color = np.array([150, 255, 255])
 
 class Camera:
     class __impl:
@@ -30,6 +32,7 @@ class Camera:
             self.__vs = vs
             self.__imgOutput = imgOutput
             self.logger = Logger()
+            self.state = State()
 
         def showImg(self, window, image):
             if self.__imgOutput:
@@ -41,7 +44,7 @@ class Camera:
                 self.logger.debug("Amount of Black: " + str(self.getAmountOfColor(warped, Colors.lower_black_color, Colors.upper_black_color)))
 
                 # cropValue: amount of the frame to be cropped out
-                cropValue = 10
+                cropValue = 7
                 optimized = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
                 optimized = cv2.resize(optimized, None, fx=2, fy=2, interpolation=cv2.INTER_AREA)
                 optimized = optimized[cropValue:optimized.shape[1] - cropValue, cropValue:optimized.shape[0] - cropValue]
@@ -61,11 +64,13 @@ class Camera:
                 if result_txt.isdigit() and int(result_txt) < 5 and int(result_txt) > 0:
                     self.logger.info("OCR: " + result_txt)
                     cv2.putText(image, str(result_txt), (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
+                    self.state.setCurrentSignal(Signal.NUM, int(result_txt))
 
             # find amount of color blue in warped area, assuming over X% is the lap signal
             elif (self.getAmountOfColor(warped, Colors.lower_blue_color, Colors.upper_blue_color) > 0.1):
                 #cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
                 self.logger.info("Rundensignal")
+                self.state.setCurrentSignal(Signal.LAP)
 
         def getAmountOfColor(self, img, lowerColor, upperColor, convert2hsv = True):
             if (convert2hsv):
@@ -74,7 +79,7 @@ class Camera:
             maskColor = cv2.inRange(img, lowerColor, upperColor)
             # get ratio of active pixels
             ratio_color = cv2.countNonZero(maskColor) / (img.size)
-            self.logger.debug("Ratio Color: " + str(ratio_color))
+            #self.logger.debug("Ratio Color: " + str(ratio_color))
             return ratio_color
 
         #color picker for manual debugging color HSV range
@@ -117,6 +122,7 @@ class Camera:
 
             # define kernel for further smoothing   
             kernel = np.ones((3,3),np.uint8)
+            
             # morphological operations
             mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
             mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
@@ -155,7 +161,7 @@ class Camera:
                         # find all contours looking like a signal with minimum area
                         if area > 500 and sideRatio >= 0.9 and sideRatio <= 1.1:
                             #self.logger.debug("Area: " + str(area) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
-                            #cv2.drawContours(image,[box],0,(0,255,0),1)
+                            cv2.drawContours(image,[box],0,(0,255,0),1)
                             warped = four_point_transform(image, [box][0])
                             self.analyzeArea(image, warped, box)
 
