@@ -7,6 +7,13 @@ class Signal(Enum):
     LAP = 2
 
 class State:
+    """
+    Class State is used to persist train data.
+
+    According to the state of the train, a next action will be evaulated.
+    The state gets input from camera, arduino and sensors like button, acceleration module.
+    """
+    
     class __impl:
         def __init__(self):
             self.CurrentSignal = Signal.NONE

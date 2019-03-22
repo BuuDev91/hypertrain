@@ -4,6 +4,12 @@ import smbus
 from state import State
 
 class Acceleration:
+    """
+    The class acceleration handles the input from the MMA8452Q over i2c.
+
+    Information is persisted to the state class.
+    """
+    
     class __impl:
         def __init__(self, logger):
             self.logger = logger

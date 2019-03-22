@@ -28,13 +28,16 @@ acceleration = Acceleration(logger)
 # program loop
 while True:
 
-    # reads any input incoming over UART
+    # reads any input incoming over UART / i2c
     communication.read()
 
-    # todo: set state from communication read
+    # todo: set state from button press
     state.Stopped = False
+
+    # todo: set state from arduino
+    state.Loaded = True
     
-    if (not state.Stopped):
+    if (not state.Stopped and state.Loaded):
         # capture image from videostream and analyze 
         camera.capture()
 

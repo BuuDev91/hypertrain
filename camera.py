@@ -15,17 +15,29 @@ from PIL import Image
 
 
 class Colors:
+    """
+    Here are different color ranges defined for creating a bit mask of the image.
+
+    """
+    
     # define color boundaries
     lower_white_color = np.array([0, 15, 0])
-    upper_white_color = np.array([180, 70, 255])
+    upper_white_color = np.array([180, 90, 255])
 
-    lower_black_color = np.array([100, 0, 0])
+    lower_black_color = np.array([0, 0, 0])
     upper_black_color = np.array([180, 255, 60])
 
-    lower_blue_color = np.array([90, 150, 100])
+    lower_blue_color = np.array([90, 150, 60])
     upper_blue_color = np.array([150, 255, 255])
 
 class Camera:
+    """
+    Class Camera is the eye of the train
+
+    With OpenCV and imutils we capture and analyze the image from the videostream
+    and try to detect signals like INFO, STOP or LAP signals and persist those image to the state class.
+    """
+
     class __impl:
 
         def __init__(self, vs, imgOutput):
@@ -79,7 +91,7 @@ class Camera:
             maskColor = cv2.inRange(img, lowerColor, upperColor)
             # get ratio of active pixels
             ratio_color = cv2.countNonZero(maskColor) / (img.size)
-            #self.logger.debug("Ratio Color: " + str(ratio_color))
+            self.logger.debug("Ratio Color: " + str(ratio_color))
             return ratio_color
 
         #color picker for manual debugging color HSV range
@@ -121,11 +133,11 @@ class Camera:
             mask = cv2.dilate(mask, None, iterations=2)
 
             # define kernel for further smoothing   
-            kernel = np.ones((3,3),np.uint8)
+            #kernel = np.ones((3,3),np.uint8)
             
             # morphological operations
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            #mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            #mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
             # leave just the outlines of the contours:
             # applying a gaussian blur and canny the outlines
@@ -145,8 +157,8 @@ class Camera:
                     _,_,angle = rect
                     # approximate shape, if it has a length of 4 we assume its a rectangle
                     approx = cv2.approxPolyDP(cnt, 0.04 * cv2.arcLength(cnt, True), True)
-                    # the rectangle must not have a too big rotation (+/-30°)
-                    if len(approx) == 4 and angle and (angle >= -90 and angle <= -80 or angle >= -10):
+                    # the rectangle must not have a too big rotation (+/-10°)
+                    if len(approx) == 4 and (angle >= -90 and angle <= -80 or angle >= -10):
                         box = cv2.boxPoints(rect)
                         box = np.int0(box)
 
@@ -156,11 +168,11 @@ class Camera:
                         # calculate area of the rectangle
                         area = w * float(h)
 
-                        #cv2.drawContours(image,[box],0,(0,0,255),1)
+                        cv2.drawContours(image,[box],0,(0,0,255),1)
 
                         # find all contours looking like a signal with minimum area
-                        if area > 500 and sideRatio >= 0.9 and sideRatio <= 1.1:
-                            #self.logger.debug("Area: " + str(area) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
+                        if area > 500 and sideRatio >= 0.8 and sideRatio <= 1.2:
+                            self.logger.debug("Area: " + str(area) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
                             cv2.drawContours(image,[box],0,(0,255,0),1)
                             warped = four_point_transform(image, [box][0])
                             self.analyzeArea(image, warped, box)

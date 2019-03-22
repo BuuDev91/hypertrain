@@ -3,6 +3,12 @@ import codecs
 import time
 
 class Logger:
+    """
+    Class Logger is used to verbose logging
+
+    Writes a File to /log/*.log for each execution
+    """
+
     timeFormat = "%Y-%m-%d_%H-%M-%S"
     logLevels = ["error", "warn", "info", "debug"]
     class __impl:
