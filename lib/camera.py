@@ -5,8 +5,9 @@ import cv2
 import sys
 import imutils
 
-from logger import Logger
-from state import State, Signal
+from lib.logger import Logger
+from lib.state import State, Signal
+from lib.compass_imp import Compass
 
 from imutils.perspective import four_point_transform
 from imutils import contours
@@ -94,6 +95,10 @@ class Camera:
             self.logger.debug("Ratio Color: " + str(ratio_color))
             return ratio_color
 
+        def getCompassFilter(self, image):
+            #tbd
+            return None
+
         #color picker for manual debugging color HSV range
         def pick_color(self, event,x,y,flags,param):
             if event == cv2.EVENT_LBUTTONDOWN:
@@ -142,7 +147,14 @@ class Camera:
             # leave just the outlines of the contours:
             # applying a gaussian blur and canny the outlines
             mask = cv2.GaussianBlur(mask, (5, 5), 0)
-            mask = cv2.Canny(mask, 35, 125)
+            #mask = cv2.Canny(mask, 35, 125)
+
+            imggrey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            img2d = cv2.threshold(imggrey, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+            mask = Compass.comapss(img2d, 1, 0)
+
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+            mask = cv2.dilate(mask, kernel)
 
             self.showImg("mask", mask)
             
@@ -171,7 +183,7 @@ class Camera:
                         cv2.drawContours(image,[box],0,(0,0,255),1)
 
                         # find all contours looking like a signal with minimum area
-                        if area > 500 and sideRatio >= 0.8 and sideRatio <= 1.2:
+                        if area > 500 :#and sideRatio >= 0.8 and sideRatio <= 1.2:
                             self.logger.debug("Area: " + str(area) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
                             cv2.drawContours(image,[box],0,(0,255,0),1)
                             warped = four_point_transform(image, [box][0])

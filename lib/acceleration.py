@@ -1,7 +1,7 @@
 #MMA8452Q i2c
 import smbus
 
-from state import State
+from lib.state import State
 
 class Acceleration:
     """
@@ -22,34 +22,33 @@ class Acceleration:
             
             try:
                 self.__initBus__()
-            except:
+            except Exception as e:
                 self.busReady = False
-                self.logger.error("i2c bus connection could not be established")
+                self.logger.error("i2c bus connection could not be established: " + str(e))
             
         def __initBus__(self):
-            self.bus = smbus.SMBus(1)
-            # MMA8452Q address, 0x1C(28)
+            # MMA8452Q address, 0x1d
             # Select Control register, 0x2A(42)
             #		0x00(00)	StandBy mode
-            self.bus.write_byte_data(0x1C, 0x2A, 0x00)
-            # MMA8452Q address, 0x1C(28)
+            self.bus.write_byte_data(0x1d, 0x2A, 0x00)
+            # MMA8452Q address, 0x1d
             # Select Control register, 0x2A(42)
             #		0x01(01)	Active mode
-            self.bus.write_byte_data(0x1C, 0x2A, 0x01)
-            # MMA8452Q address, 0x1C(28)
+            self.bus.write_byte_data(0x1d, 0x2A, 0x01)
+            # MMA8452Q address, 0x1d
             # Select Configuration register, 0x0E(14)
             #		0x00(00)	Set range to +/- 2g
-            self.bus.write_byte_data(0x1C, 0x0E, 0x00)
+            self.bus.write_byte_data(0x1d, 0x0E, 0x00)
 
             self.logger.debug("Acceleration module ready")
 
         def measure(self):
                 
-            # MMA8452Q address, 0x1C(28)
+            # MMA8452Q address, 0x1d
             # Read data back from 0x00(0), 7 bytes
             # Status register, X-Axis MSB, X-Axis LSB, Y-Axis MSB, Y-Axis LSB, Z-Axis MSB, Z-Axis LSB
             if (self.busReady):
-                data = self.bus.read_i2c_block_data(0x1C, 0x00, 7)
+                data = self.bus.read_i2c_block_data(0x1d, 0x00, 7)
 
                 # Convert the data
                 self.x = (data[1] * 256 + data[2]) / 16
@@ -64,7 +63,7 @@ class Acceleration:
                 if self.z > 2047 :
                     self.z -= 4096
 
-                self.logger.debug("Acceleration [X: %d - Y: %d - Z: %d]" %self.x %self.y %self.z)
+                self.logger.debug("Acceleration [X: %d - Y: %d - Z: %d]" %(self.x, self.y, self.z))
 
             self.state.x = self.x
             self.state.y = self.y

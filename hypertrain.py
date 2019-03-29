@@ -1,8 +1,8 @@
-from camera import Camera
-from logger import Logger
-from communication import Communication
-from acceleration import Acceleration
-from state import State
+from lib.camera import Camera
+from lib.logger import Logger
+from lib.communication import Communication
+from lib.acceleration import Acceleration
+from lib.state import State
 
 import cv2
 import time
@@ -28,7 +28,7 @@ acceleration = Acceleration(logger)
 # program loop
 while True:
 
-    # reads any input incoming over UART / i2c
+    # reads any input incoming over UART / i2c / GPIO
     communication.read()
 
     # todo: set state from button press
@@ -50,7 +50,7 @@ while True:
         data['payload'] = 100
 
         # send message to arduino over UART
-        #communication.write(json.dumps(data))
+        communication.write(json.dumps(data))
 
     # if the `q` key was pressed, break from the loop
     if (cv2.waitKey(1) & 0xFF) == ord('q'):

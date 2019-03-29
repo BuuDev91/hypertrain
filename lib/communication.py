@@ -1,11 +1,11 @@
 import serial
 import json
 
-from gpiozero import LED, Button
+from gpiozero import LED, Button, Buzzer
 
 from enum import Enum
 
-from state import State
+from lib.state import State
 
 # deserialized JSON Object
 class JSONObject(object):
@@ -33,18 +33,27 @@ class Communication:
                             bytesize=serial.EIGHTBITS,
                             timeout=0
                         )
+            self.buzzer = Buzzer(4)
+            self.led = LED(26)
+            self.button = Button(12, True)
+            self.button.when_pressed = lambda : self.startHypertrain()
+        
+        def startHypertrain(self):
+            self.state.Stopped = not self.state.Stopped
+            self.logger.info("Button pressed, new state Stopped: " + str(self.state.Stopped))
+            #self.buzzer.beep(1,1,1)
+            self.led.blink(1,1,1)
+
 
         def read(self):
-
-            if (self.state.Stopped):
-                if (Button(12, False).is_pressed): # GPIO 12 - high_active = off
-                    self.state.Stopped = False
-                    self.logger.Info("Button pressed, new state Stopped = false")
-
             incoming = ""
-            if (self.serial.inWaiting() > 0):
-                incoming = self.serial.read(self.serial.inWaiting()).decode('ascii')
+            if (self.serial.in_waiting > 0):
+
+                while self.serial.in_waiting and not "}" in incoming:
+                    incoming += self.serial.read(self.serial.inWaiting()).decode('ascii')
+                
                 self.logger.info("Receiving: " + incoming)
+                return
 
                 json = None
                 try:
@@ -54,7 +63,7 @@ class Communication:
                             self.state.setStopped(False)
                         elif (json.action == "loaded"):
                             if (not self.state.Loaded):
-                                LED(26).pulse() #GPIO 26
+                                self.led.pulse() #GPIO 26
                                 self.state.Loaded = True
                         elif (json.action == "stopped"):
                             self.state.setStopped(True)
