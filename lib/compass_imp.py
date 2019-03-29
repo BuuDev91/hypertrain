@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
 
-
 class Compass:
     #The prewitt kernels
     prewitt3 = np.array([[-1,1,1],[-1,-2,1],[-1,1,1]])

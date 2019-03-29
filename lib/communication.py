@@ -17,6 +17,7 @@ class Communication:
     Class Communication is used to communicate with the different parts of the train, or even the humans building it
 
     UART to communicate with Arduino, with a serialized JSON Object. See /UART/communication.schema.json.
+    GPIO 4  = Buzzer
     GPIO 12 = Start button
     GPIO 26 = LED 
     """
@@ -31,8 +32,7 @@ class Communication:
                             parity=serial.PARITY_NONE,
                             stopbits=serial.STOPBITS_ONE,
                             bytesize=serial.EIGHTBITS,
-                            timeout=0
-                        )
+                            timeout=0)
             self.buzzer = Buzzer(4)
             self.led = LED(26)
             self.button = Button(12, True)
@@ -49,27 +49,26 @@ class Communication:
             incoming = ""
             if (self.serial.in_waiting > 0):
 
-                while self.serial.in_waiting and not "}" in incoming:
+                while not "}" in incoming:
                     incoming += self.serial.read(self.serial.inWaiting()).decode('ascii')
                 
                 self.logger.info("Receiving: " + incoming)
-                return
 
-                json = None
-                try:
-                    json = JSONObject(incoming)
-                    if (json.sender == "arduino"):
-                        if (json.action == "start"):
-                            self.state.setStopped(False)
-                        elif (json.action == "loaded"):
-                            if (not self.state.Loaded):
-                                self.led.pulse() #GPIO 26
-                                self.state.Loaded = True
-                        elif (json.action == "stopped"):
-                            self.state.setStopped(True)
-
-                except AttributeError:
-                    self.logger.error("AttributeError in JSON")
+                if incoming:
+                    jsonObj = None
+                    try:
+                        jsonObj = json.loads(incoming)
+                        self.logger.info(jsonObj)
+                        self.logger.info(jsonObj["action"])
+                        if (jsonObj["sender"] == "arduino"):
+                            if (jsonObj["action"] == "loaded"):
+                                self.led.blink(1,1,1)
+                                if (not self.state.Loaded):
+                                    self.state.Loaded = True
+                    except AttributeError as e:
+                        self.logger.error("AttributeError in JSON: " + str(e))
+                    except Exception as e:
+                        self.logger.error("Unknown message: " + str(e))
         
         def write(self, message):
             if (message):

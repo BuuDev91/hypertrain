@@ -1,6 +1,7 @@
 import numpy as np
 
 import datetime
+import time
 import cv2
 import sys
 import imutils
@@ -46,12 +47,23 @@ class Camera:
             self.__imgOutput = imgOutput
             self.logger = Logger()
             self.state = State()
+            self.tesseract = PyTessBaseAPI(psm=PSM.SINGLE_CHAR)
 
         def showImg(self, window, image):
             if self.__imgOutput:
                 cv2.imshow(window, image)
+
+        def warmup(self):
+            time.sleep(1)
+            self.tesserOCR(np.zeros((1,1,3), np.uint8))
+
+        def tesserOCR(self, image):
+            self.tesseract.SetVariable("classify_bln_numeric_mode", "1")
+            pil_image = Image.fromarray(image)
+            self.tesseract.SetImage(pil_image)
+            return self.tesseract.GetUTF8Text()
         
-        def analyzeArea(self, image, warped, box):
+        def analyzeArea(self, image, warped, box, x, y):
             # find amount of color black in warped area, assuming over X% is a numeric signal
             if (self.getAmountOfColor(warped, Colors.lower_black_color, Colors.upper_black_color) > 0.1):
                 self.logger.debug("Amount of Black: " + str(self.getAmountOfColor(warped, Colors.lower_black_color, Colors.upper_black_color)))
@@ -65,17 +77,13 @@ class Camera:
                 self.showImg("optimized", optimized)
 
                 result_txt = ""
-                if True: #enable / disable ocr reading (slowing down)
-                    with PyTessBaseAPI(psm=PSM.SINGLE_CHAR) as api:
-                        api.SetVariable("classify_bln_numeric_mode", "1")
-                        pil_image = Image.fromarray(optimized)
-                        api.SetImage(pil_image)
-                        result_txt = api.GetUTF8Text()
+                if True: #enable / disable ocr reading
+                    result_txt = self.tesserOCR(optimized)
 
                 result_txt = result_txt.replace("\n", "")
                 result_txt = result_txt.replace(" ", "")
                 if result_txt.isdigit() and int(result_txt) < 5 and int(result_txt) > 0:
-                    self.logger.info("OCR: " + result_txt)
+                    self.logger.info("OCR: " + result_txt + " X: " + str(x)  +" Y: " + str(y))
                     cv2.putText(image, str(result_txt), (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
                     self.state.setCurrentSignal(Signal.NUM, int(result_txt))
 
@@ -127,15 +135,15 @@ class Camera:
             maskBlue = cv2.inRange(hsv, Colors.lower_blue_color, Colors.upper_blue_color)
 
             # combine color masks bitwise or
-            mask = cv2.bitwise_or(maskBlack, maskBlue)
-            mask = cv2.bitwise_or(mask, maskWhite)
+            #mask = cv2.bitwise_or(maskBlack, maskBlue)
+            #mask = cv2.bitwise_or(mask, maskWhite)
 
             # binary & gaussian threshold
-            mask = cv2.adaptiveThreshold(mask, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+            #mask = cv2.adaptiveThreshold(mask, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
             # erode and dilate masks, smoothing
-            mask = cv2.erode(mask, None, iterations=2)
-            mask = cv2.dilate(mask, None, iterations=2)
+            #mask = cv2.erode(mask, None, iterations=2)
+            #mask = cv2.dilate(mask, None, iterations=2)
 
             # define kernel for further smoothing   
             #kernel = np.ones((3,3),np.uint8)
@@ -146,14 +154,14 @@ class Camera:
 
             # leave just the outlines of the contours:
             # applying a gaussian blur and canny the outlines
-            mask = cv2.GaussianBlur(mask, (5, 5), 0)
+            #mask = cv2.GaussianBlur(mask, (5, 5), 0)
             #mask = cv2.Canny(mask, 35, 125)
 
             imggrey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             img2d = cv2.threshold(imggrey, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-            mask = Compass.comapss(img2d, 1, 0)
+            mask = Compass.comapss(img2d, 1, 0, Compass.sobel)
 
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
             mask = cv2.dilate(mask, kernel)
 
             self.showImg("mask", mask)
@@ -174,7 +182,7 @@ class Camera:
                         box = cv2.boxPoints(rect)
                         box = np.int0(box)
 
-                        (_, _, w, h) = cv2.boundingRect(approx)
+                        (x, y, w, h) = cv2.boundingRect(approx)
                         sideRatio = w / float(h)
                     
                         # calculate area of the rectangle
@@ -187,7 +195,7 @@ class Camera:
                             self.logger.debug("Area: " + str(area) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
                             cv2.drawContours(image,[box],0,(0,255,0),1)
                             warped = four_point_transform(image, [box][0])
-                            self.analyzeArea(image, warped, box)
+                            self.analyzeArea(image, warped, box, x, y)
 
             self.showImg("image", image)
 

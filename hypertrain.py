@@ -5,8 +5,8 @@ from lib.acceleration import Acceleration
 from lib.state import State
 
 import cv2
-import time
 import json
+import time
 
 from imutils.video.pivideostream import PiVideoStream
 from imutils.video import FPS
@@ -15,7 +15,7 @@ vs = PiVideoStream(resolution=(480, 368), framerate=32).start()
 camera = Camera(vs, True)
 
 # camera warmup
-time.sleep(1)
+camera.warmup()
 
 logger = Logger()
 logger.setLogLevel('info')
@@ -29,7 +29,7 @@ acceleration = Acceleration(logger)
 while True:
 
     # reads any input incoming over UART / i2c / GPIO
-    communication.read()
+    #communication.read()
 
     # todo: set state from button press
     state.Stopped = False
@@ -50,7 +50,9 @@ while True:
         data['payload'] = 100
 
         # send message to arduino over UART
-        communication.write(json.dumps(data))
+        #communication.write(json.dumps(data))
+
+    #time.sleep(5)
 
     # if the `q` key was pressed, break from the loop
     if (cv2.waitKey(1) & 0xFF) == ord('q'):
