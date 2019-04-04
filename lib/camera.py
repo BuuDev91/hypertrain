@@ -48,6 +48,7 @@ class Camera:
             self.logger = Logger()
             self.state = State()
             self.tesseract = PyTessBaseAPI(psm=PSM.SINGLE_CHAR)
+            self.compass = Compass()
 
         def showImg(self, window, image):
             if self.__imgOutput:
@@ -123,7 +124,7 @@ class Camera:
 
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-            if (self.__imgOutput):
+            if (self.__imgOutput and False): #hsv img output
                 # convert color image to HSV color scheme
                 cv2.namedWindow('hsv')
                 cv2.setMouseCallback('hsv', self.pick_color)
@@ -159,9 +160,9 @@ class Camera:
 
             imggrey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             img2d = cv2.threshold(imggrey, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-            mask = Compass.edgeDetector(img2d, Compass.prewitt)
+            mask = self.compass.edgeDetector(img2d)
 
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
             mask = cv2.dilate(mask, kernel)
 
             self.showImg("mask", mask)
@@ -193,12 +194,12 @@ class Camera:
 
                         areaRatio = rArea / cArea
 
-                        cv2.drawContours(image,[box],0,(0,0,255),1)
+                        cv2.drawContours(image, [box], 0, (0,0,255), 1)
 
                         # find all contours looking like a signal with minimum area
-                        if rArea > 500 and areaRatio >= 0.9 and areaRatio <= 1.1: # and sideRatio >= 0.8 and sideRatio <= 1.2:
+                        if rArea > 300 and 0.8 <= areaRatio <= 1.2: # and sideRatio >= 0.8 and sideRatio <= 1.2:
                             self.logger.debug("rectArea: " + str(rArea) + " contArea: " + str(cArea) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
-                            cv2.drawContours(image,[box],0,(0,255,0),1)
+                            cv2.drawContours(image, [box],0,(0,255,0),1)
                             warped = four_point_transform(image, [box][0])
                             self.analyzeArea(image, warped, box, x, y)
 
