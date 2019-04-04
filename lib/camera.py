@@ -8,7 +8,7 @@ import imutils
 
 from lib.logger import Logger
 from lib.state import State, Signal
-from lib.compass_imp import Compass
+from lib.filter import Compass
 
 from imutils.perspective import four_point_transform
 from imutils import contours
@@ -130,9 +130,9 @@ class Camera:
                 self.showImg('hsv', hsv)
             
             # extract binary image with defined color regions
-            maskWhite = cv2.inRange(hsv, Colors.lower_white_color, Colors.upper_white_color)
-            maskBlack = cv2.inRange(hsv, Colors.lower_black_color, Colors.upper_black_color)
-            maskBlue = cv2.inRange(hsv, Colors.lower_blue_color, Colors.upper_blue_color)
+            #maskWhite = cv2.inRange(hsv, Colors.lower_white_color, Colors.upper_white_color)
+            #maskBlack = cv2.inRange(hsv, Colors.lower_black_color, Colors.upper_black_color)
+            #maskBlue = cv2.inRange(hsv, Colors.lower_blue_color, Colors.upper_blue_color)
 
             # combine color masks bitwise or
             #mask = cv2.bitwise_or(maskBlack, maskBlue)
@@ -159,7 +159,7 @@ class Camera:
 
             imggrey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             img2d = cv2.threshold(imggrey, 128, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-            mask = Compass.comapss(img2d, 1, 0, Compass.sobel)
+            mask = Compass.edgeDetector(img2d, Compass.prewitt)
 
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
             mask = cv2.dilate(mask, kernel)
@@ -186,13 +186,18 @@ class Camera:
                         sideRatio = w / float(h)
                     
                         # calculate area of the rectangle
-                        area = w * float(h)
+                        rArea = w * float(h)
+
+                        # calculate area of the contour
+                        cArea = cv2.contourArea(cnt)
+
+                        areaRatio = rArea / cArea
 
                         cv2.drawContours(image,[box],0,(0,0,255),1)
 
                         # find all contours looking like a signal with minimum area
-                        if area > 500 :#and sideRatio >= 0.8 and sideRatio <= 1.2:
-                            self.logger.debug("Area: " + str(area) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
+                        if rArea > 500 and areaRatio >= 0.9 and areaRatio <= 1.1: # and sideRatio >= 0.8 and sideRatio <= 1.2:
+                            self.logger.debug("rectArea: " + str(rArea) + " contArea: " + str(cArea) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
                             cv2.drawContours(image,[box],0,(0,255,0),1)
                             warped = four_point_transform(image, [box][0])
                             self.analyzeArea(image, warped, box, x, y)
