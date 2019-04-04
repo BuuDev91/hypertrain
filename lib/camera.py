@@ -70,7 +70,7 @@ class Camera:
                 self.logger.debug("Amount of Black: " + str(self.getAmountOfColor(warped, Colors.lower_black_color, Colors.upper_black_color)))
 
                 # cropValue: amount of the frame to be cropped out
-                cropValue = 7
+                cropValue = 6
                 optimized = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
                 optimized = cv2.resize(optimized, None, fx=2, fy=2, interpolation=cv2.INTER_AREA)
                 optimized = optimized[cropValue:optimized.shape[1] - cropValue, cropValue:optimized.shape[0] - cropValue]
@@ -84,9 +84,14 @@ class Camera:
                 result_txt = result_txt.replace("\n", "")
                 result_txt = result_txt.replace(" ", "")
                 if result_txt.isdigit() and int(result_txt) < 5 and int(result_txt) > 0:
-                    self.logger.info("OCR: " + result_txt + " X: " + str(x)  +" Y: " + str(y))
                     cv2.putText(image, str(result_txt), (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
-                    self.state.setCurrentSignal(Signal.NUM, int(result_txt))
+
+                    if y >= 150:
+                        self.logger.info("Stop Signal OCR: " + result_txt + " X: " + str(x)  +" Y: " + str(y))
+                        self.state.setStopSignal(int(result_txt))
+                    else:
+                        self.logger.info("Info Signal OCR: " + result_txt + " X: " + str(x)  +" Y: " + str(y))
+                        self.state.setCurrentSignal(Signal.NUM, int(result_txt))
 
             # find amount of color blue in warped area, assuming over X% is the lap signal
             elif (self.getAmountOfColor(warped, Colors.lower_blue_color, Colors.upper_blue_color) > 0.1):
@@ -103,10 +108,6 @@ class Camera:
             ratio_color = cv2.countNonZero(maskColor) / (img.size)
             self.logger.debug("Ratio Color: " + str(ratio_color))
             return ratio_color
-
-        def getCompassFilter(self, image):
-            #tbd
-            return None
 
         #color picker for manual debugging color HSV range
         def pick_color(self, event,x,y,flags,param):
@@ -178,8 +179,9 @@ class Camera:
                     _,_,angle = rect
                     # approximate shape, if it has a length of 4 we assume its a rectangle
                     approx = cv2.approxPolyDP(cnt, 0.04 * cv2.arcLength(cnt, True), True)
+
                     # the rectangle must not have a too big rotation (+/-10°)
-                    if len(approx) == 4 and (angle >= -90 and angle <= -80 or angle >= -10):
+                    if len(approx) == 4 and (-90 <= angle <= -80 or angle >= -10):
                         box = cv2.boxPoints(rect)
                         box = np.int0(box)
 

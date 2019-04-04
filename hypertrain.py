@@ -25,37 +25,41 @@ state = State()
 
 communication = Communication(logger)
 acceleration = Acceleration(logger)
+
 # program loop
 while True:
+    try:
+        # reads any input incoming over UART / i2c / GPIO
+        #communication.read()
 
-    # reads any input incoming over UART / i2c / GPIO
-    #communication.read()
+        # todo: set state from button press
+        state.Stopped = False
 
-    # todo: set state from button press
-    state.Stopped = False
+        # todo: set state from arduino
+        state.Loaded = True
+        
+        if (not state.Stopped and state.Loaded):
+            # capture image from videostream and analyze 
+            camera.capture()
 
-    # todo: set state from arduino
-    state.Loaded = True
-    
-    if (not state.Stopped and state.Loaded):
-        # capture image from videostream and analyze 
-        camera.capture()
+            # measure acceleration
+            acceleration.measure()
 
-        # measure acceleration
-        acceleration.measure()
+            data = {}
+            data['sender'] = 'raspberry'
+            data['action'] = 'accelerate'
+            data['payload'] = 100
 
-        data = {}
-        data['sender'] = 'raspberry'
-        data['action'] = 'accelerate'
-        data['payload'] = 100
+            # send message to arduino over UART
+            #communication.write(json.dumps(data))
 
-        # send message to arduino over UART
-        #communication.write(json.dumps(data))
-
-    #time.sleep(5)
-
-    # if the `q` key was pressed, break from the loop
-    if (cv2.waitKey(1) & 0xFF) == ord('q'):
+        # if the `q` key was pressed, break from the loop
+        if (cv2.waitKey(1) & 0xFF) == ord('q'):
+            break
+            
+    except KeyboardInterrupt:
         break
+    except:
+        logger.error("error occured during program loop")
 
 logger.info('Stopped')
