@@ -12,6 +12,7 @@
       "type": "string",
       "enum": [
         "start",
+        "stop",
         "loaded",
         "approachstop",
         "accelerate",

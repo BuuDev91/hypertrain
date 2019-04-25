@@ -36,14 +36,32 @@ class Communication:
             self.buzzer = Buzzer(4)
             self.led = LED(26)
             self.button = Button(12, True)
-            self.button.when_pressed = lambda : self.startHypertrain()
+            self.button.when_pressed = lambda : self.toggleHypertrain()
         
-        def startHypertrain(self):
+        def toggleHypertrain(self):
             self.state.Stopped = not self.state.Stopped
             self.logger.info("Button pressed, new state Stopped: " + str(self.state.Stopped))
-            #self.buzzer.beep(1,1,1)
             self.led.blink(1,1,1)
+            if (self.state.Stopped):
+                self.sendStartStop('stop')
+            else:
+                self.sendStartStop('start')
 
+        def sendStartStop(self, action):
+            data = {}
+            data['sender'] = 'raspberry'
+            data['action'] = action
+            self.write(json.dumps(data))
+
+        def sendSpeedPercent(self, acceleration):
+            data = {}
+            data['sender'] = 'raspberry'
+            data['action'] = 'accelerate'
+            data['payload'] = acceleration
+            self.write(json.dumps(data))
+
+        def buzzSignalNumber(self, num):
+            self.buzzer.beep(1, 1, num)
 
         def read(self):
             incoming = ""
@@ -58,11 +76,10 @@ class Communication:
                     jsonObj = None
                     try:
                         jsonObj = json.loads(incoming)
-                        self.logger.info(jsonObj)
-                        self.logger.info(jsonObj["action"])
                         if (jsonObj["sender"] == "arduino"):
                             if (jsonObj["action"] == "loaded"):
                                 self.led.blink(1,1,1)
+                                self.buzzSignalNumber(1)
                                 if (not self.state.Loaded):
                                     self.state.Loaded = True
                     except AttributeError as e:

@@ -102,6 +102,7 @@ class Camera:
         def getAmountOfColor(self, img, lowerColor, upperColor, convert2hsv = True):
             if (convert2hsv):
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
             # create mask from color range
             maskColor = cv2.inRange(img, lowerColor, upperColor)
             # get ratio of active pixels
@@ -121,7 +122,7 @@ class Camera:
             global hsv
 
             image = self.__vs.read()
-            image = imutils.rotate(image, angle=180)
+            image = imutils.rotate(image, angle=0)
 
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
@@ -180,7 +181,7 @@ class Camera:
                     # approximate shape, if it has a length of 4 we assume its a rectangle
                     approx = cv2.approxPolyDP(cnt, 0.04 * cv2.arcLength(cnt, True), True)
 
-                    # the rectangle must not have a too big rotation (+/-10°)
+                    # the rectangle must not have a too big rotation (+/-10)
                     if len(approx) == 4 and (-90 <= angle <= -80 or angle >= -10):
                         box = cv2.boxPoints(rect)
                         box = np.int0(box)
@@ -199,7 +200,7 @@ class Camera:
                         cv2.drawContours(image, [box], 0, (0,0,255), 1)
 
                         # find all contours looking like a signal with minimum area
-                        if rArea > 300 and 0.8 <= areaRatio <= 1.2: # and sideRatio >= 0.8 and sideRatio <= 1.2:
+                        if rArea > 300 and 0.8 <= areaRatio <= 1.2: # and 0.8 <= sideRatio <= 1.2:
                             self.logger.debug("rectArea: " + str(rArea) + " contArea: " + str(cArea) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
                             cv2.drawContours(image, [box],0,(0,255,0),1)
                             warped = four_point_transform(image, [box][0])
