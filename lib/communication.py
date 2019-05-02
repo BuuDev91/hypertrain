@@ -8,9 +8,12 @@ from enum import Enum
 from lib.state import State
 
 # deserialized JSON Object
+
+
 class JSONObject(object):
     def __init__(self, j):
         self.__dict__ = json.loads(j)
+
 
 class Communication:
     """
@@ -26,24 +29,27 @@ class Communication:
         def __init__(self, logger):
             self.logger = logger
             self.state = State()
-            self.serial = serial.Serial(            
-                            port='/dev/serial0',
-                            baudrate = 9600,
-                            parity=serial.PARITY_NONE,
-                            stopbits=serial.STOPBITS_ONE,
-                            bytesize=serial.EIGHTBITS,
-                            timeout=0)
+            self.serial = serial.Serial(
+                port='/dev/serial0',
+                baudrate=9600,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS,
+                timeout=0)
             self.buzzer = Buzzer(4)
             self.led = LED(26)
             self.button = Button(12, True)
-            self.button.when_pressed = lambda : self.toggleHypertrain()
-        
+            self.button.when_pressed = lambda: self.toggleHypertrain()
+
         def toggleHypertrain(self):
             self.state.Stopped = not self.state.Stopped
-            self.logger.info("Button pressed, new state Stopped: " + str(self.state.Stopped))
-            self.led.blink(1,1,1)
+            #self.state.Loaded = not self.state.Loaded
+            self.logger.info(
+                "Button pressed, new state Stopped: " + str(self.state.Stopped))
+            self.led.blink(1, 1, 1)
             if (self.state.Stopped):
                 self.sendStartStop('stop')
+                self.state.reset()
             else:
                 self.sendStartStop('start')
 
@@ -53,12 +59,20 @@ class Communication:
             data['action'] = action
             self.write(json.dumps(data))
 
-        def sendSpeedPercent(self, acceleration):
+        def sendApproachStop(self):
             data = {}
             data['sender'] = 'raspberry'
-            data['action'] = 'accelerate'
-            data['payload'] = acceleration
+            data['action'] = 'approachstop'
             self.write(json.dumps(data))
+
+        def sendSpeedPercent(self, acceleration):
+            if (self.state.AccelerationPercent != self.state.LastAccelerationPercent):
+                self.state.LastAccelerationPercent = acceleration
+                data = {}
+                data['sender'] = 'raspberry'
+                data['action'] = 'accelerate'
+                data['payload'] = acceleration
+                self.write(json.dumps(data))
 
         def buzzSignalNumber(self, num):
             self.buzzer.beep(1, 1, num)
@@ -68,8 +82,9 @@ class Communication:
             if (self.serial.in_waiting > 0):
 
                 while not "}" in incoming:
-                    incoming += self.serial.read(self.serial.inWaiting()).decode('ascii')
-                
+                    incoming += self.serial.read(self.serial.inWaiting()
+                                                 ).decode('ascii')
+
                 self.logger.info("Receiving: " + incoming)
 
                 if incoming:
@@ -78,7 +93,7 @@ class Communication:
                         jsonObj = json.loads(incoming)
                         if (jsonObj["sender"] == "arduino"):
                             if (jsonObj["action"] == "loaded"):
-                                self.led.blink(1,1,1)
+                                self.led.blink(1, 1, 1)
                                 self.buzzSignalNumber(1)
                                 if (not self.state.Loaded):
                                     self.state.Loaded = True
@@ -86,14 +101,15 @@ class Communication:
                         self.logger.error("AttributeError in JSON: " + str(e))
                     except Exception as e:
                         self.logger.error("Unknown message: " + str(e))
-        
+
         def write(self, message):
             if (message):
-                self.logger.debug("Sending: " + message)
+                self.logger.info("Sending: " + message)
                 self.serial.write(message.encode())
-    
-    # Singleton 
+
+    # Singleton
     __inst = None
+
     def __init__(self, logger):
         # Check whether we already have an instance
         if Communication.__inst is None:

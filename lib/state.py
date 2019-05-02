@@ -1,10 +1,13 @@
 from datetime import datetime
+import time
 from enum import Enum
+
 
 class Signal(Enum):
     NONE = 0
     NUM = 1
     LAP = 2
+
 
 class State:
     """
@@ -13,15 +16,24 @@ class State:
     According to the state of the train, a next action will be evaulated.
     The state gets input from camera, arduino and sensors like button, acceleration module.
     """
-    
+
     class __impl:
         def __init__(self):
             self.CurrentSignal = Signal.NONE
             self.CurrentNum = 0
             self.CurrentSignalTimeStamp = None
+
             self.StopSignalNum = 0
             self.StopSignalTimeStamp = None
+            self.StopSignalAnnounced = False
+
+            self.LastLapSignalTimeStamp = None
+            self.LapSignalCount = 0
+            self.LapSignalTimeThreshold = 5
+
             self.AccelerationPercent = 0
+            self.LastAccelerationPercent = 0
+
             self.Loaded = False
             self.ApproachStop = False
             self.Stopped = True
@@ -29,21 +41,37 @@ class State:
             self.x = 0
             self.y = 0
             self.z = 0
-        
-        def setCurrentSignal(self, signal, num = 0):
+
+        def reset(self):
+            self.__init__()
+
+        def setCurrentSignal(self, signal, num=0):
             self.CurrentSignal = signal
             self.CurrentNum = num
-            self.CurrentSignalTimeStamp = datetime.now()
+            self.CurrentSignalTimeStamp = time.time()
+
+        def captureLapSignal(self):
+            if (not self.LastLapSignalTimeStamp):
+                self.LastLapSignalTimeStamp = time.now()
+
+            # if seen lap signal within 5 seconds again, dont count it as a new lap
+            if ((self.LastLapSignalTimeStamp + self.LapSignalTimeThreshold) <= time.now()):
+                self.LastLapSignalTimeStamp = time.now()
+                self.LapSignalCount += 1
 
         def setStopSignal(self, num):
             self.StopSignalNum = num
-            self.StopSignalTimeStamp = datetime.now()
+            self.StopSignalTimeStamp = time.time()
+
+        def setStopSignalAnnounced(self, announced):
+            self.StopSignalAnnounced = announced
 
         def setStopped(self, stopped):
             self.Stopped = stopped
 
     # Singleton, there can only be one state of the train
     __inst = None
+
     def __init__(self):
         # Check whether we already have an instance
         if State.__inst is None:

@@ -37,19 +37,33 @@ while True:
 
         # todo: set state from arduino
         #state.Loaded = True
-        
+
         if (not state.Stopped and state.Loaded):
-            # capture image from videostream and analyze 
+            # capture image from videostream and analyze
             camera.capture()
 
             # measure acceleration
             acceleration.measure()
 
-            communication.sendSpeedPercent(100)
+            if (state.StopSignalNum == 0):
+                state.AccelerationPercent = 25
+                communication.sendSpeedPercent(state.AccelerationPercent)
+            # if we found our stop signal, announce it
+            elif (state.StopSignalNum != 0 and not state.StopSignalAnnounced):
+                communication.buzzSignalNumber(state.StopSignalNum)
+                communication.sendSpeedPercent(100)
+                state.setStopSignalAnnounced(True)
+            # if we are close to passing round 2, we deccelerate to X percent
+            elif (state.LapSignalCount >= 2 and not state.ApproachStop):
+                communication.sendSpeedPercent(10)
+                communication.sendApproachStop()
+            elif (state.LapSignalCount < 2):
+                state.AccelerationPercent = 100
+                communication.sendSpeedPercent(state.AccelerationPercent)
 
         if (cv2.waitKey(1) & 0xFF) == ord('q'):
             break
-            
+
     except KeyboardInterrupt:
         break
     except Exception as e:
