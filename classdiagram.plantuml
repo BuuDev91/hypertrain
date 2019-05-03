@@ -1,0 +1,126 @@
+@startuml
+class Hypertrain {
+    - VideoStream vs
+    - Camera camera
+    - Logger logger
+    - Communication communication
+    - Acceleration acceleration
+    - State state
+    + void hyperloop()
+}
+
+class State {
+    __ hypertrain parameters __
+    + Signal CurrentSignal
+    + int CurrentNum
+    + TimeStamp CurrentSignalTimeStamp
+
+    + int StopSignalNum
+    + TimeStamp StopSignalTimeStamp
+    + boolean StopSignalAnnounced
+
+    + TimeStamp LastLapSignalTimeStamp
+    + int LapSignalCount
+    + int LapSignalTimeThreshold
+
+    + int AccelerationPercent
+    + int LastAccelerationPercent
+
+    + bolean Loaded
+    + boolean ApproachStop
+    + boolean Stopped
+
+    __ debug parameters __
+    + boolean Standalone
+    + boolean NoImageTransfer
+
+    __ acceleration parameters __
+    + int x
+    + int y
+    + int z
+    ____
+    + void reset()
+    + void setCurrentSignal(Signal signal, int num)
+    + void captureLapSignal()
+    + void setStopSignal(int num)
+}
+
+class Logger {
+    - File logFile
+    + void createLogFile(string directory, string filename)
+    + void setLogLevel(string loglevel)
+    + void log(string message, int loglevel)
+    + void debug(string message)
+    + void info(string message)
+    + void warning(string message)
+    + void error(string message)
+    + void logError(Exception e)
+}
+
+class Communication {
+    - Logger logger
+    - State state
+    - Serial serial
+    - Buzzer buzzer
+    - Led led
+    - Button button
+    + void toggleHypertrain()
+    + void sendStartStop()
+    + void sendApproachStop()
+    + void sendSpeedPercent(int percent)
+    + void buzzSignalNumber(int times)
+    + void readSerial()
+    + void writeSerial()
+}
+
+class Camera {
+    - VideoStream vs
+    - Logger logger
+    - State state
+    - Tesseract tesseract
+    - Filter Filter
+    - Color color
+    + void showImg(string window, Image image)
+    + void warmup()
+    + int tesserOCR(Image image)
+    + string analyzeRect(Image image)
+    + string analyzeSquare(Image image)
+    + float getAmountOfColor(Image image, Color color)
+    + void capture()
+}
+
+class Filter {
+    - Kernel prewitt
+    - Kernel kirsch
+    - Kernel sobel
+    - Kernel robinson
+    + Mask colorEdgeDetector(Image image)
+    + Mask greyEdgeDetector(Image image)
+    + Mask autoCanny(Image image)
+}
+
+class Acceleration {
+    - State state
+    - Logger logger
+    - Bus bus
+    - void initBus()
+    + void measure()
+}
+
+Hypertrain o-- State
+Hypertrain o-- Communication
+Hypertrain o-- Logger
+Hypertrain o-- Camera
+Hypertrain o-- Acceleration
+
+Camera o-- Logger
+Camera o-- State
+Camera *-- Filter
+
+Communication o-- Logger
+Communication o-- State
+
+Acceleration o-- Logger
+Acceleration o-- State
+
+@enduml

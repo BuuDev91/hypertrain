@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 
 
-class Compass:
+class Filter:
     class __impl:
         def __init__(self):
             # prewitt kernels
@@ -60,7 +60,6 @@ class Compass:
 
             newImage = np.zeros((d_h, d_w), dtype=np.int16)
             for channel in range(d):
-                # Apply a convolution
                 for i, kernel in enumerate(self.prewitt):
                     mag[i] = np.abs(cv2.filter2D(
                         tmp_2d[:, :, channel], cv2.CV_16S, kernel))
@@ -81,16 +80,32 @@ class Compass:
 
             return mag.max(axis=0).astype(np.uint8)
 
+        def autoCanny(self, img, sigma=0.33):
+
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            image = cv2.GaussianBlur(gray, (3, 3), 2)
+
+            # compute the median of the single channel pixel intensities
+            v = np.median(image)
+
+            # apply automatic Canny edge detection using the computed median
+            lower = int(max(0, (1.0 - sigma) * v))
+            upper = int(min(255, (1.0 + sigma) * v))
+            edged = cv2.Canny(image, lower, upper)
+
+            # return the edged image
+            return edged
+
     # Singleton
     __inst = None
 
     def __init__(self):
         # Check whether we already have an instance
-        if Compass.__inst is None:
-            Compass.__inst = Compass.__impl()
+        if Filter.__inst is None:
+            Filter.__inst = Filter.__impl()
 
         # Store instance reference in the handle
-        self.__dict__["_Compass__inst"] = Compass.__inst
+        self.__dict__["_Filter__inst"] = Filter.__inst
 
     # Delegate attribute getters/setters to instance
     def __getattr__(self, attr):

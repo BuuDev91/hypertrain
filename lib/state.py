@@ -37,6 +37,10 @@ class State:
             self.Loaded = False
             self.ApproachStop = False
             self.Stopped = True
+
+            self.Standalone = False
+            self.NoImageTransfer = False
+
             # acceleration parameters
             self.x = 0
             self.y = 0

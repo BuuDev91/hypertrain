@@ -8,7 +8,7 @@ import imutils
 
 from lib.logger import Logger
 from lib.state import State, Signal
-from lib.filter import Compass
+from lib.filter import Filter
 
 from imutils.perspective import four_point_transform
 from imutils import contours
@@ -49,7 +49,7 @@ class Camera:
             self.logger = Logger()
             self.state = State()
             self.tesseract = PyTessBaseAPI(psm=PSM.SINGLE_CHAR)
-            self.compass = Compass()
+            self.filter = Filter()
 
         def showImg(self, window, image):
             if self.__imgOutput:
@@ -65,7 +65,15 @@ class Camera:
             self.tesseract.SetImage(pil_image)
             return self.tesseract.GetUTF8Text()
 
-        def analyzeArea(self, image, warped, box, x, y):
+        def analyzeRect(self, image, warped, box, x, y):
+            # find amount of color blue in warped area, assuming over X% is the lap signal
+            if (self.getAmountOfColor(warped, Colors.lower_blue_color, Colors.upper_blue_color) > 0.1):
+                #cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
+                self.logger.info("Rundensignal")
+                self.state.setCurrentSignal(Signal.LAP)
+                return "Rundensignal"
+
+        def analyzeSquare(self, image, warped, box, x, y):
             color = ''
             # find amount of color black in warped area, assuming over X% is a numeric signal
             if (self.getAmountOfColor(warped, Colors.lower_black_color, Colors.upper_black_color) > 0.1):
@@ -73,10 +81,10 @@ class Camera:
                 self.logger.debug("Amount of Black: " + str(self.getAmountOfColor(
                     warped, Colors.lower_black_color, Colors.upper_black_color)))
 
-            # elif (self.getAmountOfColor(warped, Colors.lower_white_color, Colors.upper_white_color) > 0.3):
-            #    color = "White"
-            #    self.logger.debug("Amount of White: " + str(self.getAmountOfColor(
-            #        warped, Colors.lower_white_color, Colors.upper_white_color)))
+            elif (self.getAmountOfColor(warped, Colors.lower_white_color, Colors.upper_white_color) > 0.1):
+                color = "White"
+                self.logger.debug("Amount of White: " + str(self.getAmountOfColor(
+                    warped, Colors.lower_white_color, Colors.upper_white_color)))
 
             if (color):
                 # cropValue: amount of the frame to be cropped out
@@ -96,26 +104,20 @@ class Camera:
                 result_txt = result_txt.replace("\n", "")
                 result_txt = result_txt.replace(" ", "")
                 if result_txt.isdigit() and int(result_txt) < 5 and int(result_txt) > 0:
-                    cv2.putText(image, str(result_txt), (100, 200),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
-
                     if y <= 100:
                         self.logger.info(
                             "Stop Signal OCR: " + result_txt + " X: " + str(x) + " Y: " + str(y))
                         self.state.setStopSignal(int(result_txt))
+                        return "S: " + result_txt
                     else:
                         self.logger.info(
                             "Info Signal OCR: " + result_txt + " X: " + str(x) + " Y: " + str(y))
                         self.state.setCurrentSignal(
                             Signal.NUM, int(result_txt))
-
-            # find amount of color blue in warped area, assuming over X% is the lap signal
-            elif (self.getAmountOfColor(warped, Colors.lower_blue_color, Colors.upper_blue_color) > 0.1):
-                #cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
-                self.logger.info("Rundensignal")
-                self.state.setCurrentSignal(Signal.LAP)
+                        return "I: " + result_txt
 
         def getAmountOfColor(self, img, lowerColor, upperColor, convert2hsv=True):
+
             if (convert2hsv):
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
@@ -123,46 +125,29 @@ class Camera:
             maskColor = cv2.inRange(img, lowerColor, upperColor)
             # get ratio of active pixels
             ratio_color = cv2.countNonZero(maskColor) / (img.size)
-            self.logger.debug("Ratio Color: " + str(ratio_color))
             return ratio_color
 
-        # color picker for manual debugging color HSV range
+        # color picker for manual debugging
         def pick_color(self, event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
-                pixel = hsv[y, x]
+                pixel = image[y, x]
                 color = np.array([pixel[0], pixel[1], pixel[2]])
                 self.logger.info(color)
 
         # capture frames from the camera
         def capture(self):
-            global hsv
+            global image
 
             image = self.__vs.read()
-            image = imutils.rotate(image, angle=0)
+            image = imutils.rotate(image, angle=180)
 
-            # focus only on the
+            # focus only on the part of the image, where a signal could occur
             # image = image[int(image.shape[0] * 0.2):int(image.shape[0]
             #                                            * 0.8), 0:int(image.shape[1]*0.666)]
-            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-            if (self.__imgOutput and False):  # hsv img output
-                # convert color image to HSV color scheme
-                cv2.namedWindow('hsv')
-                cv2.setMouseCallback('hsv', self.pick_color)
-                self.showImg('hsv', hsv)
 
             # maskBlack = cv2.inRange(
-            #    image, np.array([0, 0, 0]), np.array([15, 15, 15]))
-            mask = self.compass.greyEdgeDetector(image)
-            #mask = cv2.bitwise_or(maskBlack, mask)
-            #mask = cv2.bitwise_or(mask, maskWhite)
-
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-            mask = cv2.dilate(mask, kernel, iterations=2)
-            mask = cv2.erode(mask, kernel, iterations=2)
-
-            mask = cv2.GaussianBlur(mask, (7, 7), 0)
-            #mask = cv2.Canny(mask, 35, 125)
+            #    image, np.array([0, 0, 0]), np.array([30, 30, 30]))
+            mask = self.filter.autoCanny(image, 0.33)
 
             # get a list of contours in the mask, chaining to just endpoints
             _, cnts, _ = cv2.findContours(
@@ -183,7 +168,7 @@ class Camera:
 
                         box = cv2.boxPoints(rect)
                         box = np.int0(box)
-                        cv2.drawContours(image, [box], 0, (0, 0, 255), 1)
+                        #cv2.drawContours(image, [box], 0, (0, 0, 255), 1)
 
                         (x, y, w, h) = cv2.boundingRect(approx)
                         sideRatio = w / float(h)
@@ -193,18 +178,42 @@ class Camera:
 
                         # calculate area of the contour
                         cArea = cv2.contourArea(cnt)
-
-                        areaRatio = rArea / cArea
+                        if (cArea):
+                            areaRatio = rArea / cArea
+                        else:
+                            areaRatio = 0
 
                         # find all contours looking like a signal with minimum area
-                        if 300 > rArea < 10000 and 0.8 <= areaRatio <= 1.2:  # and 0.8 <= sideRatio <= 1.2:
-                            self.logger.debug("rectArea: " + str(rArea) + " contArea: " + str(
-                                cArea) + " Angle: " + str(angle) + " SideRatio: " + str(sideRatio))
-                            cv2.drawContours(image, [box], 0, (0, 255, 0), 1)
-                            warped = four_point_transform(image, [box][0])
-                            self.analyzeArea(image, warped, box, x, y)
+                        if 500 < rArea < 10000 and 0.8 <= areaRatio <= 1.2:
+                            warp = four_point_transform(image, [box][0])
+                            result = None
+                            # is it a square? then check for info or stop signal
+                            if 0.8 <= sideRatio <= 1.2:
+                                result = self.analyzeSquare(
+                                    image, warp, box, x, y)
+                            # if its a rectangle, this might be the lap signal
+                            else:
+                                result = self.analyzeRect(
+                                    image, warp, box, x, y)
+
+                            if (result):
+                                M = cv2.moments(cnt)
+                                cX = int(M["m10"] / M["m00"])
+                                cY = int(M["m01"] / M["m00"])
+
+                                cv2.drawContours(
+                                    image, [cnt], -1, (0, 255, 0), 2)
+                                cv2.putText(
+                                    image, result, (cX - 30, cY - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
             self.showImg("mask", mask)
+
+            if (self.__imgOutput):  # hsv img output
+                hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+                # convert color image to HSV color scheme
+                cv2.namedWindow('image')
+                cv2.setMouseCallback('image', self.pick_color)
+
             self.showImg("image", image)
 
     # Singleton
