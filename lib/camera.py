@@ -10,6 +10,7 @@ from lib.logger import Logger
 from lib.state import State, Signal
 from lib.filter import Filter
 
+from sklearn.cluster import KMeans
 from imutils.perspective import four_point_transform
 from imutils import contours
 from tesserocr import PyTessBaseAPI, PSM
@@ -65,9 +66,52 @@ class Camera:
             self.tesseract.SetImage(pil_image)
             return self.tesseract.GetUTF8Text()
 
+        def dominantColor(self, img, clusters=2):
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+            # reshaping to a list of pixels
+            img = img.reshape((img.shape[0] * img.shape[1], 3))
+
+            # using k-means to cluster pixels
+            kmeans = KMeans(n_clusters=clusters)
+            kmeans.fit(img)
+
+            centroids = kmeans.cluster_centers_
+
+            # create a histogram and label each section
+            numLabels = np.arange(0, len(np.unique(kmeans.labels_)) + 1)
+            (hist, _) = np.histogram(kmeans.labels_, bins=numLabels)
+
+            # normalize the histogram, such that it sums to one
+            hist = hist.astype("float")
+            hist /= hist.sum()
+
+            # plot
+            bar = np.zeros((50, 300, 3), dtype="uint8")
+            startX = 0
+
+            percent = 0.0
+            color = None
+            for (pcnt, clr) in zip(hist, centroids):
+                if (percent < pcnt):
+                    percent = pcnt
+                    color = clr
+                endX = startX + (percent * 300)
+                cv2.rectangle(bar, (int(startX), 0), (int(endX), 50),
+                              color.astype("uint8").tolist(), -1)
+                startX = endX
+
+            self.showImg("histogram", bar)
+
+            rgb = color.astype("uint8").tolist()
+
+            self.logger.info(str(rgb)+" "+str(percent)+"%")
+
+            return rgb
+
         def analyzeRect(self, image, warped, box, x, y):
             # find amount of color blue in warped area, assuming over X% is the lap signal
-            if (self.getAmountOfColor(warped, Colors.lower_blue_color, Colors.upper_blue_color) > 0.1):
+            if (self.getAmountOfColor(warped, np.array([150, 50, 0]), np.array([255, 150, 100]), False) > 0.1):
                 #cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
                 self.logger.info("Rundensignal")
                 self.state.setCurrentSignal(Signal.LAP)
@@ -87,24 +131,36 @@ class Camera:
                     warped, Colors.lower_white_color, Colors.upper_white_color)))
 
             if (color):
-                # cropValue: amount of the frame to be cropped out
-                cropValue = 6
                 optimized = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-                optimized = cv2.resize(
-                    optimized, None, fx=2, fy=2, interpolation=cv2.INTER_AREA)
+
+                # cropValue: amount of the frame to be cropped out
+                cropValue = 3
                 optimized = optimized[cropValue:optimized.shape[1] -
                                       cropValue, cropValue:optimized.shape[0] - cropValue]
-                optimized = cv2.GaussianBlur(optimized, (5, 5), 0)
+                optimized = cv2.resize(
+                    optimized, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+
+                # median blur
+                optimized = cv2.blur(optimized, (5, 5))
+
+                # binary image
+                optimized = cv2.threshold(
+                    optimized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+
+                # binary inversion if dominant color is black
+                if (color == "Black"):
+                    optimized = cv2.bitwise_not(optimized)
+
                 self.showImg("optimized", optimized)
 
-                result_txt = ""
-                if True:  # enable / disable ocr reading
-                    result_txt = self.tesserOCR(optimized)
+                result_txt = self.tesserOCR(optimized)
 
+                # clean up output form tesseract
                 result_txt = result_txt.replace("\n", "")
                 result_txt = result_txt.replace(" ", "")
+
                 if result_txt.isdigit() and int(result_txt) < 5 and int(result_txt) > 0:
-                    if y <= 100:
+                    if y <= 150:
                         self.logger.info(
                             "Stop Signal OCR: " + result_txt + " X: " + str(x) + " Y: " + str(y))
                         self.state.setStopSignal(int(result_txt))
@@ -117,7 +173,6 @@ class Camera:
                         return "I: " + result_txt
 
         def getAmountOfColor(self, img, lowerColor, upperColor, convert2hsv=True):
-
             if (convert2hsv):
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
@@ -159,6 +214,7 @@ class Camera:
                 for cnt in cnts:
                     rect = cv2.minAreaRect(cnt)
                     _, _, angle = rect
+
                     # approximate shape, if it has a length of 4 we assume its a rectangle
                     approx = cv2.approxPolyDP(
                         cnt, 0.04 * cv2.arcLength(cnt, True), True)
@@ -188,7 +244,7 @@ class Camera:
                             warp = four_point_transform(image, [box][0])
                             result = None
                             # is it a square? then check for info or stop signal
-                            if 0.8 <= sideRatio <= 1.2:
+                            if 0.9 <= sideRatio <= 1.1:
                                 result = self.analyzeSquare(
                                     image, warp, box, x, y)
                             # if its a rectangle, this might be the lap signal
@@ -197,6 +253,7 @@ class Camera:
                                     image, warp, box, x, y)
 
                             if (result):
+                                self.dominantColor(warp, 4)
                                 M = cv2.moments(cnt)
                                 cX = int(M["m10"] / M["m00"])
                                 cY = int(M["m01"] / M["m00"])
@@ -210,9 +267,9 @@ class Camera:
 
             if (self.__imgOutput):  # hsv img output
                 hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-                # convert color image to HSV color scheme
                 cv2.namedWindow('image')
                 cv2.setMouseCallback('image', self.pick_color)
+                #self.showImg("hsv", hsv)
 
             self.showImg("image", image)
 

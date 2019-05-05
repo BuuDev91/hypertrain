@@ -83,7 +83,7 @@ class Filter:
         def autoCanny(self, img, sigma=0.33):
 
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            image = cv2.GaussianBlur(gray, (3, 3), 2)
+            image = cv2.GaussianBlur(gray, (0, 0), sigma)
 
             # compute the median of the single channel pixel intensities
             v = np.median(image)

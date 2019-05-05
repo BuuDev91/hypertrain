@@ -11,7 +11,8 @@ class Logger:
     """
 
     timeFormat = "%Y-%m-%d_%H-%M-%S"
-    logLevels = ["error", "warn", "info", "debug"]
+    timeStampFormat = "%H:%M:%S"
+    logLevels = ["error", "warn", "info", "debug", "measure"]
 
     class __impl:
         def __init__(self, directory='log', filename=None, level='info'):
@@ -39,13 +40,16 @@ class Logger:
             self.__logLevel = Logger.logLevels.index(level)
 
         def log(self, msg, level=2):
-            timeStr = time.strftime(Logger.timeFormat)
+            timeStr = time.strftime(Logger.timeStampFormat)
             levelStr = Logger.logLevels[level].upper()
-            out = "%s [%s] %s" % (timeStr, levelStr, msg)
+            out = "%s | %s | %s" % (timeStr, levelStr, msg)
             if level <= self.__logLevel:
                 print(out)
             self.__logFile.write(out)
             self.__logFile.write('\n')
+
+        def measure(self, msg):
+            self.log(msg, 4)
 
         def debug(self, msg):
             self.log(msg, 3)

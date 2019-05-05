@@ -22,10 +22,10 @@ def hyperloop():
 
     state = State()
     for p in sys.argv:
-        if (p == "standalone" or p == "s"):
+        if (p == "--standalone" or p == "-s"):
             state.Standalone = True
             logger.info("Standalone mode activated")
-        elif (p == "nocamera" or p == "n"):
+        elif (p == "--nocamera" or p == "-nc"):
             state.NoImageTransfer = True
             logger.info("Camera image transfer X11 disabled")
 
@@ -73,7 +73,7 @@ def hyperloop():
         except KeyboardInterrupt:
             break
         except Exception as e:
-            logger.error(str(e))
+            logger.logError(e)
             traceback.print_exc(limit=3, file=sys.stdout)
 
     communication.sendStartStop('stop')

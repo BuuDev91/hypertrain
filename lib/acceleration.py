@@ -1,7 +1,8 @@
-#MMA8452Q i2c
+# MMA8452Q i2c
 import smbus
 
 from lib.state import State
+
 
 class Acceleration:
     """
@@ -9,7 +10,7 @@ class Acceleration:
 
     Information is persisted to the state class.
     """
-    
+
     class __impl:
         def __init__(self, logger):
             self.logger = logger
@@ -19,13 +20,13 @@ class Acceleration:
             self.z = 0.0
             self.busReady = True
             self.state = State()
-            
+
             try:
                 self.__initBus__()
             except Exception as e:
                 self.busReady = False
-                self.logger.error("i2c bus connection could not be established: " + str(e))
-            
+                self.logger.logError(e)
+
         def __initBus__(self):
             # MMA8452Q address, 0x1d
             # Select Control register, 0x2A(42)
@@ -43,7 +44,7 @@ class Acceleration:
             self.logger.debug("Acceleration module ready")
 
         def measure(self):
-                
+
             # MMA8452Q address, 0x1d
             # Read data back from 0x00(0), 7 bytes
             # Status register, X-Axis MSB, X-Axis LSB, Y-Axis MSB, Y-Axis LSB, Z-Axis MSB, Z-Axis LSB
@@ -52,27 +53,29 @@ class Acceleration:
 
                 # Convert the data
                 self.x = (data[1] * 256 + data[2]) / 16
-                if self.x > 2047 :
+                if self.x > 2047:
                     self.x -= 4096
 
                 self.y = (data[3] * 256 + data[4]) / 16
-                if self.y  > 2047 :
-                    self.y  -= 4096
+                if self.y > 2047:
+                    self.y -= 4096
 
                 self.z = (data[5] * 256 + data[6]) / 16
-                if self.z > 2047 :
+                if self.z > 2047:
                     self.z -= 4096
 
-                self.logger.debug("Acceleration [X: %d - Y: %d - Z: %d]" %(self.x, self.y, self.z))
+                self.logger.measure(
+                    "X: %d; Y: %d; Z: %d]" % (self.x, self.y, self.z))
 
             self.state.x = self.x
             self.state.y = self.y
             self.state.z = self.z
-            
+
             return [self.x, self.y, self.z]
 
     # SINGLETON EVERYTHING :D
     __inst = None
+
     def __init__(self, logger):
         # Check whether we already have an instance
         if Acceleration.__inst is None:
@@ -87,5 +90,3 @@ class Acceleration:
 
     def __setattr__(self, attr, value):
         return setattr(self.__inst, attr, value)
-
-    
