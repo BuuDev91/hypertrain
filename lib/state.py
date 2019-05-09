@@ -40,6 +40,7 @@ class State:
 
             self.Standalone = False
             self.NoImageTransfer = False
+            self.RecordImage = False
 
             # acceleration parameters
             self.x = 0

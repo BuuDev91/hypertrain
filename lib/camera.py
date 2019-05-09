@@ -1,5 +1,6 @@
 import numpy as np
 
+import os
 import datetime
 import time
 import cv2
@@ -51,6 +52,17 @@ class Camera:
             self.state = State()
             self.tesseract = PyTessBaseAPI(psm=PSM.SINGLE_CHAR)
             self.filter = Filter()
+
+            self.recordStamp = time.strftime(self.logger.timeFormat)
+            self.recordNum = 0
+            self.recordFolder = None
+            if (self.state.RecordImage):
+                root = 'record'
+                if not os.path.isdir(root):
+                    os.mkdir(root)
+                self.recordFolder = os.path.join(root, self.recordStamp)
+                if not os.path.isdir(self.recordFolder):
+                    os.mkdir(self.recordFolder)
 
         def showImg(self, window, image):
             if self.__imgOutput:
@@ -105,7 +117,7 @@ class Camera:
 
             rgb = color.astype("uint8").tolist()
 
-            self.logger.info(str(rgb)+" "+str(percent)+"%")
+            self.logger.info(str(rgb) + " " + str(percent)+"%")
 
             return rgb
 
@@ -190,11 +202,14 @@ class Camera:
                 self.logger.info(color)
 
         # capture frames from the camera
-        def capture(self):
+        def capture(self, savedImg=None):
             global image
 
-            image = self.__vs.read()
-            image = imutils.rotate(image, angle=180)
+            if (savedImg is not None):
+                image = savedImg
+            else:
+                image = self.__vs.read()
+                image = imutils.rotate(image, angle=0)
 
             # focus only on the part of the image, where a signal could occur
             # image = image[int(image.shape[0] * 0.2):int(image.shape[0]
@@ -272,6 +287,10 @@ class Camera:
                 #self.showImg("hsv", hsv)
 
             self.showImg("image", image)
+            if (self.state.RecordImage):
+                self.recordNum += 1
+                cv2.imwrite(os.path.join(self.recordFolder,
+                                         str(self.recordNum) + ".jpg"), image)
 
     # Singleton
     __inst = None

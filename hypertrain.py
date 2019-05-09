@@ -12,6 +12,7 @@ import traceback
 
 from imutils.video.pivideostream import PiVideoStream
 from imutils.video import FPS
+import picamera
 
 
 def hyperloop():
@@ -28,8 +29,13 @@ def hyperloop():
         elif (p == "--nocamera" or p == "-nc"):
             state.NoImageTransfer = True
             logger.info("Camera image transfer X11 disabled")
+        elif (p == "--record" or p == "-r"):
+            state.RecordImage = True
 
     vs = PiVideoStream(resolution=(480, 368), framerate=32).start()
+    piCamera = vs.camera
+    piCamera.exposure_mode = 'sports'
+    piCamera.ISO = 1600
     camera = Camera(vs, not state.NoImageTransfer)
 
     # camera warmup

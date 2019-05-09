@@ -65,7 +65,7 @@ class Acceleration:
                     self.z -= 4096
 
                 self.logger.measure(
-                    "X: %d; Y: %d; Z: %d]" % (self.x, self.y, self.z))
+                    "X: %d; Y: %d; Z: %d" % (self.x, self.y, self.z))
 
             self.state.x = self.x
             self.state.y = self.y
