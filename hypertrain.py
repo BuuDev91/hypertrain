@@ -31,6 +31,7 @@ def hyperloop():
             logger.info("Camera image transfer X11 disabled")
         elif (p == "--record" or p == "-r"):
             state.RecordImage = True
+            logger.info("Record mode activated")
 
     vs = PiVideoStream(resolution=(480, 368), framerate=32).start()
     piCamera = vs.camera

@@ -171,7 +171,7 @@ class Camera:
                 result_txt = result_txt.replace("\n", "")
                 result_txt = result_txt.replace(" ", "")
 
-                if result_txt.isdigit() and int(result_txt) < 5 and int(result_txt) > 0:
+                if result_txt.isdigit() and int(result_txt) < 10 and int(result_txt) > 0:
                     if y <= 150:
                         self.logger.info(
                             "Stop Signal OCR: " + result_txt + " X: " + str(x) + " Y: " + str(y))
@@ -268,7 +268,7 @@ class Camera:
                                     image, warp, box, x, y)
 
                             if (result):
-                                self.dominantColor(warp, 4)
+                                #self.dominantColor(warp, 4)
                                 M = cv2.moments(cnt)
                                 cX = int(M["m10"] / M["m00"])
                                 cY = int(M["m01"] / M["m00"])
