@@ -35,7 +35,6 @@ def hyperloop():
         # program loop
         while True:
             try:
-
                 image = cv2.imread(os.path.join(
                     p, str(imageNum) + ".jpg"), 1)
 
@@ -44,12 +43,12 @@ def hyperloop():
                 key = cv2.waitKey(0) & 0xFF
 
                 if key == ord("n"):
-                    if (os.path.exists(os.path.join(
-                            p, str(imageNum + 1) + ".jpg"))):
+                    cv2.destroyAllWindows()
+                    if (os.path.exists(os.path.join(p, str(imageNum + 1) + ".jpg"))):
                         imageNum += 1
                 elif key == ord("b"):
-                    if (os.path.exists(os.path.join(
-                            p, str(imageNum - 1) + ".jpg"))):
+                    cv2.destroyAllWindows()
+                    if (os.path.exists(os.path.join(p, str(imageNum - 1) + ".jpg"))):
                         imageNum -= 1
                 elif key == ord('q'):
                     break

@@ -1,3 +1,3 @@
-robocopy . \\hypertrain\pishare\hypertrain *.py
-robocopy . \\hypertrain\pishare *.sh
-robocopy .\lib \\hypertrain\pishare\hypertrain\lib /mir
+robocopy . \\hypertrain.local\pishare\hypertrain *.py
+robocopy . \\hypertrain.local\pishare *.sh
+robocopy .\lib \\hypertrain.local\pishare\hypertrain\lib /mir
