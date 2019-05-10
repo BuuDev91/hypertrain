@@ -14,11 +14,20 @@ import traceback
 from imutils.video.pivideostream import PiVideoStream
 from imutils.video import FPS
 
+import re
+
+
+def sorted_aphanumeric(data):
+    def convert(text): return int(text) if text.isdigit() else text.lower()
+    def alphanum_key(key): return [convert(c)
+                                   for c in re.split('([0-9]+)', key)]
+    return sorted(data, key=alphanum_key)
+
 
 def hyperloop():
 
     imageFolder = None
-    imageNum = 1
+    imageNum = 0
 
     logger = Logger('relog')
     logger.setLogLevel('debug')
@@ -33,10 +42,12 @@ def hyperloop():
 
     if imageFolder:
         # program loop
+        files = sorted_aphanumeric(os.listdir(imageFolder))
         while True:
             try:
-                image = cv2.imread(os.path.join(
-                    p, str(imageNum) + ".jpg"), 1)
+                file = os.path.join(p, files[imageNum])
+                logger.info("Load file: " + file)
+                image = cv2.imread(file, 1)
 
                 camera.capture(image)
 
@@ -44,11 +55,11 @@ def hyperloop():
 
                 if key == ord("n"):
                     cv2.destroyAllWindows()
-                    if (os.path.exists(os.path.join(p, str(imageNum + 1) + ".jpg"))):
+                    if (imageNum + 1 < len(files)):
                         imageNum += 1
                 elif key == ord("b"):
                     cv2.destroyAllWindows()
-                    if (os.path.exists(os.path.join(p, str(imageNum - 1) + ".jpg"))):
+                    if (imageNum - 1 >= 0):
                         imageNum -= 1
                 elif key == ord('q'):
                     break
