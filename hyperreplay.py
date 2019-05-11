@@ -1,7 +1,5 @@
 from lib.camera import Camera
 from lib.logger import Logger
-from lib.communication import Communication
-from lib.acceleration import Acceleration
 from lib.state import State
 
 import os
@@ -11,14 +9,21 @@ import time
 import sys
 import traceback
 
-from imutils.video.pivideostream import PiVideoStream
-from imutils.video import FPS
+
+import re
+
+
+def sorted_aphanumeric(data):
+    def convert(text): return int(text) if text.isdigit() else text.lower()
+    def alphanum_key(key): return [convert(c)
+                                   for c in re.split('([0-9]+)', key)]
+    return sorted(data, key=alphanum_key)
 
 
 def hyperloop():
 
     imageFolder = None
-    imageNum = 1
+    imageNum = 0
 
     logger = Logger('relog')
     logger.setLogLevel('debug')
@@ -28,15 +33,19 @@ def hyperloop():
     for p in sys.argv:
         if (p != "" and os.path.isdir(p)):
             imageFolder = p
+        elif (p != "" and p.isdigit()):
+            imageNum = int(p)
 
     camera = Camera(None, True)
 
     if imageFolder:
         # program loop
+        files = sorted_aphanumeric(os.listdir(imageFolder))
         while True:
             try:
-                image = cv2.imread(os.path.join(
-                    p, str(imageNum) + ".jpg"), 1)
+                file = os.path.join(imageFolder, files[imageNum])
+                logger.info("["+str(imageNum)+"] Loaded file: " + file)
+                image = cv2.imread(file, 1)
 
                 camera.capture(image)
 
@@ -44,11 +53,11 @@ def hyperloop():
 
                 if key == ord("n"):
                     cv2.destroyAllWindows()
-                    if (os.path.exists(os.path.join(p, str(imageNum + 1) + ".jpg"))):
+                    if (imageNum + 1 < len(files)):
                         imageNum += 1
                 elif key == ord("b"):
                     cv2.destroyAllWindows()
-                    if (os.path.exists(os.path.join(p, str(imageNum - 1) + ".jpg"))):
+                    if (imageNum - 1 >= 0):
                         imageNum -= 1
                 elif key == ord('q'):
                     break
