@@ -2,4 +2,6 @@ log/
 *.pyc
 *.code-workspace
 *.png
+*.jpg
+*.log
 .vscode/settings.json
