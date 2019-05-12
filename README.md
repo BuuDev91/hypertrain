@@ -2,9 +2,9 @@
 ## Image recognition of an autonomous train
 
 ### Instructions:
-Pull Raspberry Image from here: https://drive.google.com/drive/folders/1YQowDY1B15QcnUpEM-oBepjDDtdwZNe5?usp=sharing
+Pull Raspberry Image from here: https://drive.google.com/open?id=1Ihv16ni99QBWytFY6QIsAlyrrYBB2-Uc
 comes with precompiled sources & dependencies:\
-Python 3.5.3, OpenCV 3.4.3, imutils, numpy, scipy, matplotlib
+Python 3.5.3, OpenCV 3.4.3, imutils, numpy, scipy, matplotlib, TesseractOCR
 
 #### Dependencies (install in cv):
 Further dependencies have to be installed to use i2c bus:
