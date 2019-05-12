@@ -312,11 +312,11 @@ class Camera:
                                 cv2.putText(contourImage, str(
                                     self.cntNum), (cX - 30, cY - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-                            self.logger.debug("[" + str(self.cntNum) + "] SideRatio: " + str(sideRatio) + 
-                            " AreaRatio: " + str(rectContAreaRatio) + 
-                            " RectArea: " + str(rArea) + 
-                            " AbsSize: " + str(absoluteSizeToImageRatio) +
-                            " CntPoints: " + str(len(approx)))
+                            self.logger.debug("[" + str(self.cntNum) + "] SideRatio: " + str(sideRatio) +
+                                              " AreaRatio: " + str(rectContAreaRatio) +
+                                              " RectArea: " + str(rArea) +
+                                              " AbsSize: " + str(absoluteSizeToImageRatio) +
+                                              " CntPoints: " + str(len(approx)))
 
                             result = None
                             # is it approx a square, or standing rect? then check for info or stop signal
