@@ -54,7 +54,7 @@ class Camera:
             self.logger = Logger()
             self.state = State()
             self.tesseract = PyTessBaseAPI(psm=PSM.SINGLE_CHAR)
-            #self.tesseract.SetVariable("classify_bln_numeric_mode", "1")
+            self.tesseract.SetVariable("classify_bln_numeric_mode", "1")
             self.tesseract.SetVariable("tessedit_char_whitelist", "123456789")
             self.filter = Filter()
 
@@ -161,7 +161,7 @@ class Camera:
                     optimized, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
 
                 # median blur
-                optimized = cv2.blur(optimized, (5, 5))
+                optimized = cv2.blur(optimized, (3, 3))
 
                 # binary image
                 optimized = cv2.threshold(
@@ -172,10 +172,23 @@ class Camera:
                     optimized = cv2.bitwise_not(optimized)
 
                 self.showImg("opt " + str(self.cntNum), optimized)
+                
+                # now check the frame (2px) of the image.. there shouldn't be any noise since its a clean signal background
+                h, w = optimized.shape[0:2]
+                for iHeight in range(h):
+                    for iFrame in range(1,2):
+                        if not(optimized[iHeight, iFrame]) or not(optimized[iHeight, w - iFrame]):
+                            print(str(self.cntNum) + " gone")
+                            return False
+                for iWidth in range(w):
+                    for iFrame in range(1,2):
+                        if not(optimized[iFrame, iWidth]): #or not(optimized[h - iFrame, iWidth])
+                            print(str(self.cntNum) + " gone")
+                            return False
 
                 result_txt = self.tesserOCR(optimized)
 
-                # clean up output form tesseract
+                # clean up output from tesseract
                 result_txt = result_txt.replace("\n", "")
                 result_txt = result_txt.replace(" ", "")
 
@@ -191,6 +204,8 @@ class Camera:
                         self.state.setCurrentSignal(
                             Signal.NUM, int(result_txt))
                         return "I: " + result_txt
+                else:
+                    self.logger.debug(str(self.cntNum) + " False OCR: " + result_txt)
 
         def getAmountOfColor(self, img, lowerColor, upperColor, convert2hsv=True):
             if (convert2hsv):
@@ -233,13 +248,9 @@ class Camera:
             mask = cv2.GaussianBlur(contourImage, (3, 3), 0)
             mask = self.filter.autoCanny(mask)
 
-            #kernel = np.ones((5, 5), np.uint8)
-            #mask = cv2.dilate(mask, None)
-            #mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-
             # get a list of contours in the mask, chaining to just endpoints
             cnts = imutils.grab_contours(cv2.findContours(
-                mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE))
+                mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
 
             # only proceed if at least one contour was found
             if len(cnts) > 0:
@@ -249,11 +260,12 @@ class Camera:
                     rect = cv2.minAreaRect(cnt)
                     _, _, angle = rect
 
-                    # approximate shape, if it has a length of 4 we assume its a rectangle
+                    # approximate shape
                     approx = cv2.approxPolyDP(
                         cnt, 0.02 * cv2.arcLength(cnt, True), True)
 
                     # the rectangle must not have a too big rotation (+/-10)
+                    # and more than 3 connecting points
                     if len(approx) >= 3 and (-90 <= angle <= -80 or angle >= -10):
 
                         box = cv2.boxPoints(rect)
@@ -265,14 +277,9 @@ class Camera:
                         if (y <= image_height * 0.2 or x >= image_width * 0.7):
                             continue
 
-                        if (w <= 5 or h <= 10):
+                        if (w <= 5 or h <= 5):
                             continue
 
-                        if (self.__imgOutput):
-                            cv2.drawContours(
-                                contourImage, [box], 0, (0, 0, 255), 1)
-
-                        #[box][0][0][1] = [box][0][0][1] * 2
                         sideRatio = w / float(h)
 
                         absoluteSizeToImageRatio = (100 / (image_width * image_height)) * (w*h)
@@ -290,47 +297,50 @@ class Camera:
                         if (h*2 < w):
                             result = self.analyzeRect(image, four_point_transform(image, [box][0]), box, x, y)
                             if (result):
+                                cv2.drawContours(contourImage, [cnt], -1, (0, 255, 0), 2)
+                        # find all contours looking like a signal with minimum area
+                        elif absoluteSizeToImageRatio >= 0.05:
+                            
+
+                            result = None
+                            # is it approx a square, or standing rect? then check for info or stop signal
+                            if 0.2 <= sideRatio <= 1.1:
+                                # transform ROI
+                                if (sideRatio <= 0.9):
+                                    coords, size, angle = rect
+                                    size = size[0] + 8, size[1] + 4
+                                    coords = coords[0] - 1, coords[1] + 0.9
+
+                                    rect = coords, size, angle
+                                    box = cv2.boxPoints(rect)
+                                    box = np.int0(box)
+
+                                warp = four_point_transform(image, [box][0])
+
+                                result = self.analyzeSquare(
+                                    image, warp, box, x, y)
+                            # if its a sideways rectangle, this might be the lap signal
+                            else:
+                                result = self.analyzeRect(image, four_point_transform(image, [box][0]), box, x, y)
+
+                            if (result):
                                 cv2.drawContours(
                                     contourImage, [cnt], -1, (0, 255, 0), 2)
-                        # find all contours looking like a signal with minimum area
-                        elif rArea > 75 and rectContAreaRatio > 20:
-                            # transform to a square
-                            coords, size, angle = rect
-                            if (size[0] > size[1]):
-                                size = size[0], size[0]
-                            else:
-                                size = size[1], size[1]
-                            rect = coords, size, angle
-                            box = cv2.boxPoints(rect)
-                            box = np.int0(box)
-                            warp = four_point_transform(image, [box][0])
-
                             if (self.__imgOutput):
+                                cv2.drawContours(contourImage, [box], 0, (0, 0, 255), 1)
                                 M = cv2.moments(cnt)
                                 cX = int(M["m10"] / M["m00"])
                                 cY = int(M["m01"] / M["m00"])
                                 cv2.putText(contourImage, str(
                                     self.cntNum), (cX - 30, cY - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-                            self.logger.debug("[" + str(self.cntNum) + "] SideRatio: " + str(sideRatio) +
-                                              " AreaRatio: " + str(rectContAreaRatio) +
-                                              " RectArea: " + str(rArea) +
-                                              " AbsSize: " + str(absoluteSizeToImageRatio) +
-                                              " CntPoints: " + str(len(approx)))
-
-                            result = None
-                            # is it approx a square, or standing rect? then check for info or stop signal
-                            if sideRatio <= 1.1:
-                                result = self.analyzeSquare(
-                                    image, warp, box, x, y)
-                            # if its a rectangle, this might be the lap signal
-                            else:
-                                result = self.analyzeRect(
-                                    image, warp, box, x, y)
-
-                            if (result):
-                                cv2.drawContours(
-                                    contourImage, [cnt], -1, (0, 255, 0), 2)
+                                self.logger.debug("[" + str(self.cntNum) + "] SideRatio: " + str(sideRatio) +
+                                            " AreaRatio: " + str(rectContAreaRatio) +
+                                            " ContArea: " + str(cArea) +
+                                            " RectArea: " + str(rArea) +
+                                            " AbsSize: " + str(absoluteSizeToImageRatio) +
+                                            " CntPoints: " + str(len(approx)) + 
+                                            " Size: " + str(w) +"x"+str(h)) 
 
             if (self.__imgOutput):  # hsv img output
                 hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -338,12 +348,10 @@ class Camera:
                 cv2.setMouseCallback('contourImage', self.pick_color)
                 #self.showImg("hsv", hsv)
 
-            self.showImg("contourImage", np.hstack(
-                (contourImage, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))))
+            self.showImg("contourImage", np.hstack((contourImage, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))))
             if (self.state.RecordImage):
                 self.recordNum += 1
-                cv2.imwrite(os.path.join(self.recordFolder,
-                                         str(self.recordNum) + ".jpg"), image)
+                cv2.imwrite(os.path.join(self.recordFolder, str(self.recordNum) + ".jpg"), image)
 
     # Singleton
     __inst = None
