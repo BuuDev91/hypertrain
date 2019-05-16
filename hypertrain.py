@@ -67,7 +67,7 @@ def hyperloop():
                     communication.sendSpeedPercent(100)
                     state.setStopSignalAnnounced(True)
                 # if we are close to passing round 2, we deccelerate to X percent
-                elif (state.LapSignalCount >= 2 and not state.ApproachStop):
+                elif (state.LapSignalCount >= 3 and not state.ApproachStop):
                     communication.sendSpeedPercent(10)
                     communication.sendApproachStop()
                 elif (state.LapSignalCount < 2):

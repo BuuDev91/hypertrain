@@ -32,10 +32,10 @@ class Colors:
     upper_black_hsv = np.array([180, 255, 60])
 
     lower_black_rgb = np.array([0, 0, 0])
-    upper_blackc_rgb = np.array([70, 70, 70])
+    upper_black_rgb = np.array([70, 70, 70])
 
-    lower_blue_color = np.array([150, 70, 0])
-    upper_blue_color = np.array([200, 100, 40])
+    lower_blue_color = np.array([94, 80, 2])
+    upper_blue_color = np.array([126, 255, 255])
 
 
 class Camera:
@@ -59,10 +59,13 @@ class Camera:
             # self.tesseract.SetVariable("tessedit_char_whitelist", "123456789")
             self.filter = Filter()
 
+            self.signalThresholdY = 150
+
             self.recordStamp = time.strftime(self.logger.timeFormat)
             self.recordNum = 0
             self.recordFolder = None
             self.cntNum = 0
+
             if (self.state.RecordImage):
                 root = 'record'
                 if not os.path.isdir(root):
@@ -81,7 +84,7 @@ class Camera:
 
         def tesserOCR(self, image):
             pil_image = Image.fromarray(image)
-            return pytesseract.image_to_string(image, lang="digits", config="--psm 10")
+            return pytesseract.image_to_string(pil_image, lang="digits", config="--psm 10")
             # self.tesseract.SetImage(pil_image)
             # return self.tesseract.GetUTF8Text()
 
@@ -106,8 +109,8 @@ class Camera:
             hist /= hist.sum()
 
             # plot
-            bar = np.zeros((50, 300, 3), dtype="uint8")
-            startX = 0
+            #bar = np.zeros((50, 300, 3), dtype="uint8")
+            #startX = 0
 
             percent = 0.0
             color = None
@@ -115,10 +118,10 @@ class Camera:
                 if (percent < pcnt):
                     percent = pcnt
                     color = clr
-                endX = startX + (percent * 300)
+                #endX = startX + (percent * 300)
                 # cv2.rectangle(bar, (int(startX), 0), (int(endX), 50),
                 #              color.astype("uint8").tolist(), -1)
-                startX = endX
+                #startX = endX
 
             # self.showImg("histogram", bar)
 
@@ -129,9 +132,9 @@ class Camera:
             return rgb
 
         def analyzeRect(self, image, warped, box, x, y):
-            dominantColor = np.array(self.dominantColor(warped))
+            #dominantColor = np.array(self.dominantColor(warped))
             # find amount of color blue in warped area, assuming over X% is the lap signal
-            if (self.getAmountOfColor(warped, np.array([150, 50, 0]), np.array([255, 150, 100]), True) > 0.1):
+            if (self.getAmountOfColor(warped, Colors.lower_blue_color, Colors.upper_blue_color, True) > 0.1):
                 # if (cv2.inRange(dominantColor, np.array([80, 40, 20]), np.array([120, 60, 50]))):
                 # cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
                 self.logger.info("Rundensignal")
@@ -197,12 +200,12 @@ class Camera:
                 result_txt = result_txt.replace(" ", "")
 
                 if result_txt.isdigit() and 0 < int(result_txt) < 10:
-                    if y <= 150:
+                    if y <= self.signalThresholdY:
                         self.logger.info(
                             "Stop Signal OCR: " + result_txt + " X: " + str(x) + " Y: " + str(y))
                         self.state.setStopSignal(int(result_txt))
                         return "S: " + result_txt
-                    else:
+                    elif self.state.StopSignalNum != 0:
                         self.logger.info(
                             "Info Signal OCR: " + result_txt + " X: " + str(x) + " Y: " + str(y))
                         self.state.setCurrentSignal(
@@ -297,7 +300,7 @@ class Camera:
                         else:
                             continue
 
-                        if (h*2 < w):
+                        if (h*2 < w and y <= self.signalThresholdY):
                             result = self.analyzeRect(
                                 image, four_point_transform(image, [box][0]), box, x, y)
                             if (result):
@@ -322,10 +325,6 @@ class Camera:
 
                                 result = self.analyzeSquare(
                                     image, warp, box, x, y)
-                            # if its a sideways rectangle, this might be the lap signal
-                            else:
-                                result = self.analyzeRect(
-                                    image, four_point_transform(image, [box][0]), box, x, y)
 
                             if (result):
                                 cv2.drawContours(
@@ -345,7 +344,7 @@ class Camera:
                                                       " RectArea: " + str(rArea) +
                                                       " AbsSize: " + str(absoluteSizeToImageRatio) +
                                                       " CntPoints: " + str(len(approx)) +
-                                                      " Size: " + str(w) + "x"+str(h))
+                                                      " Size: " + str(w) + "x" + str(h))
 
             if (self.__imgOutput):  # hsv img output
                 hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -355,6 +354,7 @@ class Camera:
 
             self.showImg("contourImage", np.hstack(
                 (contourImage, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))))
+
             if (self.state.RecordImage):
                 self.recordNum += 1
                 cv2.imwrite(os.path.join(self.recordFolder,

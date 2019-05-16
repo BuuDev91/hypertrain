@@ -12,6 +12,7 @@ import traceback
 
 import re
 
+
 def sorted_aphanumeric(data):
     def convert(text): return int(text) if text.isdigit() else text.lower()
     def alphanum_key(key): return [convert(c)
@@ -34,6 +35,8 @@ def hyperloop():
             imageFolder = p
         elif (p != "" and p.isdigit()):
             imageNum = int(p)
+
+    state.setStopSignal(1)
 
     camera = Camera(None, True)
 

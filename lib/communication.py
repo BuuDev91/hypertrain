@@ -85,22 +85,28 @@ class Communication:
                     incoming += self.serial.read(self.serial.inWaiting()
                                                  ).decode('ascii')
 
-                self.logger.info("Receiving: " + incoming)
 
-                if incoming:
-                    jsonObj = None
-                    try:
-                        jsonObj = json.loads(incoming)
-                        if (jsonObj["sender"] == "arduino"):
-                            if (jsonObj["action"] == "loaded"):
-                                self.led.blink(1, 1, 1)
-                                self.buzzSignalNumber(1)
-                                if (not self.state.Loaded):
-                                    self.state.Loaded = True
-                    except AttributeError as e:
-                        self.logger.error("AttributeError in JSON: " + str(e))
-                    except Exception as e:
-                        self.logger.error("Unknown message: " + str(e))
+                incomingMsgs = incoming.splitlines()
+                for incoming in incomingMsgs:
+                    if incoming:
+                        self.logger.info("Receiving: " + incoming)
+                        jsonObj = None
+                        try:
+                            jsonObj = json.loads(incoming)
+                            if (jsonObj["sender"] == "arduino"):
+                                if (jsonObj["action"] == "loaded"):
+                                    self.led.blink(1, 1, 1)
+                                    self.buzzSignalNumber(1)
+                                    if (not self.state.Loaded):
+                                        self.state.Loaded = True
+                                if (jsonObj["action"] == "speed"):
+                                    continue
+                                if (jsonObj["action"] == "way"):
+                                    continue
+                        except AttributeError as e:
+                            self.logger.error("AttributeError in JSON: " + str(e))
+                        except Exception as e:
+                            self.logger.error("Unknown message: " + str(e))
 
         def write(self, message):
             if (message):
