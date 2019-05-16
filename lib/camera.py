@@ -84,7 +84,8 @@ class Camera:
 
         def tesserOCR(self, image):
             pil_image = Image.fromarray(image)
-            return pytesseract.image_to_string(pil_image, lang="digits", config="--psm 10")
+            # oem 1 = LTSM, psm 10 = single char
+            return pytesseract.image_to_string(pil_image, lang="eng", config="--oem 1 --psm 10")
             # self.tesseract.SetImage(pil_image)
             # return self.tesseract.GetUTF8Text()
 
@@ -167,8 +168,8 @@ class Camera:
                 optimized = cv2.resize(
                     optimized, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
 
-                # median blur
-                optimized = cv2.blur(optimized, (3, 3))
+                # blur
+                optimized = cv2.GaussianBlur(optimized, (5, 5), 0)
 
                 # binary image
                 optimized = cv2.threshold(
@@ -180,17 +181,16 @@ class Camera:
 
                 # now check the frame (2px) of the image.. there shouldn't be any noise since its a clean signal background
                 h, w = optimized.shape[0:2]
-                for iHeight in range(h):
-                    for iFrame in range(1, 2):
+
+                for iFrame in range(1, 2):
+                    for iHeight in range(h):
                         if not(optimized[iHeight, iFrame]) or not(optimized[iHeight, w - iFrame]):
                             return False
-                for iWidth in range(w):
-                    for iFrame in range(1, 2):
+                    for iWidth in range(w):
                         # or not(optimized[h - iFrame, iWidth])
                         if not(optimized[iFrame, iWidth]):
                             return False
 
-                # self.showImg("opt " + str(self.cntNum), optimized)
                 # cv2.imwrite("records/opt/" + str(self.cntNum) + ".jpg", optimized)
 
                 result_txt = self.tesserOCR(optimized)
@@ -200,6 +200,7 @@ class Camera:
                 result_txt = result_txt.replace(" ", "")
 
                 if result_txt.isdigit() and 0 < int(result_txt) < 10:
+                    self.showImg("opt " + str(self.cntNum), optimized)
                     if y <= self.signalThresholdY:
                         self.logger.info(
                             "Stop Signal OCR: " + result_txt + " X: " + str(x) + " Y: " + str(y))
@@ -245,13 +246,9 @@ class Camera:
             contourImage = image.copy()
 
             # focus only on the part of the image, where a signal could occur
-            # image = image[int(image.shape[0] * 0.2):int(image.shape[0]
-            #                                            * 0.8), 0:int(image.shape[1]*0.666)]
+            #image = image[int(image.shape[0] * 0.2):int(image.shape[0] * 0.8), 0:int(image.shape[1]*0.666)]
 
-            # maskBlack = cv2.inRange(
-            #    image, np.array([0, 0, 0]), np.array([30, 30, 30]))
-            mask = cv2.GaussianBlur(contourImage, (3, 3), 0)
-            mask = self.filter.autoCanny(mask)
+            mask = self.filter.autoCanny(image)
 
             # get a list of contours in the mask, chaining to just endpoints
             cnts = imutils.grab_contours(cv2.findContours(
@@ -290,7 +287,7 @@ class Camera:
                         absoluteSizeToImageRatio = (
                             100 / (image_width * image_height)) * (w*h)
 
-                        # calculate area of the rectangle
+                        # calculate area of the bounding rectangle
                         rArea = w * float(h)
 
                         # calculate area of the contour
@@ -300,14 +297,17 @@ class Camera:
                         else:
                             continue
 
-                        if (h*2 < w and y <= self.signalThresholdY):
+                        cv2.drawContours(contourImage, [box], 0, (255, 0, 0), 1)
+
+                        if (h*2 < w and y <= self.signalThresholdY and rectContAreaRatio >= 80):
                             result = self.analyzeRect(
                                 image, four_point_transform(image, [box][0]), box, x, y)
                             if (result):
                                 cv2.drawContours(
                                     contourImage, [cnt], -1, (0, 255, 0), 2)
+                                print(rectContAreaRatio)
                         # find all contours looking like a signal with minimum area
-                        elif absoluteSizeToImageRatio >= 0.05:
+                        elif absoluteSizeToImageRatio >= 0.01:
                             result = None
                             # is it approx a square, or standing rect? then check for info or stop signal
                             if 0.2 <= sideRatio <= 1.1:
@@ -320,6 +320,8 @@ class Camera:
                                     rect = coords, size, angle
                                     box = cv2.boxPoints(rect)
                                     box = np.int0(box)
+                                
+                                cv2.drawContours(contourImage, [box], 0, (0, 255, 0), 1)
 
                                 warp = four_point_transform(image, [box][0])
 
@@ -327,8 +329,8 @@ class Camera:
                                     image, warp, box, x, y)
 
                             if (result):
-                                cv2.drawContours(
-                                    contourImage, [cnt], -1, (0, 255, 0), 2)
+                                """ cv2.drawContours(
+                                    contourImage, [cnt], -1, (0, 255, 0), 2) """
                                 if (self.__imgOutput):
                                     cv2.drawContours(
                                         contourImage, [box], 0, (0, 0, 255), 1)
@@ -346,11 +348,11 @@ class Camera:
                                                       " CntPoints: " + str(len(approx)) +
                                                       " Size: " + str(w) + "x" + str(h))
 
-            if (self.__imgOutput):  # hsv img output
+            """ if (self.__imgOutput):  # hsv img output
                 hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
                 cv2.namedWindow('contourImage')
                 cv2.setMouseCallback('contourImage', self.pick_color)
-                # self.showImg("hsv", hsv)
+                # self.showImg("hsv", hsv) """
 
             self.showImg("contourImage", np.hstack(
                 (contourImage, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))))
