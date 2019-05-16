@@ -6,7 +6,7 @@ import time
 import cv2
 import sys
 import imutils
-
+import pytesseract
 from lib.logger import Logger
 from lib.state import State, Signal
 from lib.filter import Filter
@@ -53,9 +53,10 @@ class Camera:
             self.__imgOutput = imgOutput
             self.logger = Logger()
             self.state = State()
-            self.tesseract = PyTessBaseAPI(psm=PSM.SINGLE_CHAR)
-            self.tesseract.SetVariable("classify_bln_numeric_mode", "1")
-            self.tesseract.SetVariable("tessedit_char_whitelist", "123456789")
+            # self.tesseract = PyTessBaseAPI(psm=PSM.SINGLE_CHAR, path='/usr/share/tesseract-ocr/4.00/tessdata/')
+            # self.tesseract.SetVariable("oem", "0")
+            # self.tesseract.SetVariable("classify_bln_numeric_mode", "1")
+            # self.tesseract.SetVariable("tessedit_char_whitelist", "123456789")
             self.filter = Filter()
 
             self.recordStamp = time.strftime(self.logger.timeFormat)
@@ -80,8 +81,9 @@ class Camera:
 
         def tesserOCR(self, image):
             pil_image = Image.fromarray(image)
-            self.tesseract.SetImage(pil_image)
-            return self.tesseract.GetUTF8Text()
+            return pytesseract.image_to_string(image, lang="digits", config="--psm 10")
+            # self.tesseract.SetImage(pil_image)
+            # return self.tesseract.GetUTF8Text()
 
         def dominantColor(self, img, clusters=2):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -114,21 +116,23 @@ class Camera:
                     percent = pcnt
                     color = clr
                 endX = startX + (percent * 300)
-                cv2.rectangle(bar, (int(startX), 0), (int(endX), 50),
-                              color.astype("uint8").tolist(), -1)
+                # cv2.rectangle(bar, (int(startX), 0), (int(endX), 50),
+                #              color.astype("uint8").tolist(), -1)
                 startX = endX
 
             # self.showImg("histogram", bar)
 
             rgb = color.astype("uint8").tolist()
 
-            self.logger.info("Cnt: " + str(self.cntNum) +
-                             " " + str(rgb) + " " + str(percent)+"%")
+            # self.logger.info("Cnt: " + str(self.cntNum) +
+            #                 " " + str(rgb) + " " + str(percent)+"%")
             return rgb
 
         def analyzeRect(self, image, warped, box, x, y):
+            dominantColor = np.array(self.dominantColor(warped))
             # find amount of color blue in warped area, assuming over X% is the lap signal
-            if (self.getAmountOfColor(warped, np.array([150, 50, 0]), np.array([255, 150, 100]), False) > 0.1):
+            if (self.getAmountOfColor(warped, np.array([150, 50, 0]), np.array([255, 150, 100]), True) > 0.1):
+                # if (cv2.inRange(dominantColor, np.array([80, 40, 20]), np.array([120, 60, 50]))):
                 # cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
                 self.logger.info("Rundensignal")
                 self.state.setCurrentSignal(Signal.LAP)
@@ -156,7 +160,7 @@ class Camera:
                 # cropValue: amount of the frame to be cropped out
                 cropValue = 0
                 optimized = optimized[cropValue:optimized.shape[0] -
-                                      cropValue, cropValue:optimized.shape[1] - cropValue]
+                                      cropValue, cropValue: optimized.shape[1] - cropValue]
                 optimized = cv2.resize(
                     optimized, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
 
@@ -171,20 +175,20 @@ class Camera:
                 if (color == "Black"):
                     optimized = cv2.bitwise_not(optimized)
 
-                self.showImg("opt " + str(self.cntNum), optimized)
-                
                 # now check the frame (2px) of the image.. there shouldn't be any noise since its a clean signal background
                 h, w = optimized.shape[0:2]
                 for iHeight in range(h):
-                    for iFrame in range(1,2):
+                    for iFrame in range(1, 2):
                         if not(optimized[iHeight, iFrame]) or not(optimized[iHeight, w - iFrame]):
-                            print(str(self.cntNum) + " gone")
                             return False
                 for iWidth in range(w):
-                    for iFrame in range(1,2):
-                        if not(optimized[iFrame, iWidth]): #or not(optimized[h - iFrame, iWidth])
-                            print(str(self.cntNum) + " gone")
+                    for iFrame in range(1, 2):
+                        # or not(optimized[h - iFrame, iWidth])
+                        if not(optimized[iFrame, iWidth]):
                             return False
+
+                # self.showImg("opt " + str(self.cntNum), optimized)
+                # cv2.imwrite("records/opt/" + str(self.cntNum) + ".jpg", optimized)
 
                 result_txt = self.tesserOCR(optimized)
 
@@ -204,8 +208,6 @@ class Camera:
                         self.state.setCurrentSignal(
                             Signal.NUM, int(result_txt))
                         return "I: " + result_txt
-                else:
-                    self.logger.debug(str(self.cntNum) + " False OCR: " + result_txt)
 
         def getAmountOfColor(self, img, lowerColor, upperColor, convert2hsv=True):
             if (convert2hsv):
@@ -282,7 +284,8 @@ class Camera:
 
                         sideRatio = w / float(h)
 
-                        absoluteSizeToImageRatio = (100 / (image_width * image_height)) * (w*h)
+                        absoluteSizeToImageRatio = (
+                            100 / (image_width * image_height)) * (w*h)
 
                         # calculate area of the rectangle
                         rArea = w * float(h)
@@ -295,13 +298,13 @@ class Camera:
                             continue
 
                         if (h*2 < w):
-                            result = self.analyzeRect(image, four_point_transform(image, [box][0]), box, x, y)
+                            result = self.analyzeRect(
+                                image, four_point_transform(image, [box][0]), box, x, y)
                             if (result):
-                                cv2.drawContours(contourImage, [cnt], -1, (0, 255, 0), 2)
+                                cv2.drawContours(
+                                    contourImage, [cnt], -1, (0, 255, 0), 2)
                         # find all contours looking like a signal with minimum area
                         elif absoluteSizeToImageRatio >= 0.05:
-                            
-
                             result = None
                             # is it approx a square, or standing rect? then check for info or stop signal
                             if 0.2 <= sideRatio <= 1.1:
@@ -321,37 +324,41 @@ class Camera:
                                     image, warp, box, x, y)
                             # if its a sideways rectangle, this might be the lap signal
                             else:
-                                result = self.analyzeRect(image, four_point_transform(image, [box][0]), box, x, y)
+                                result = self.analyzeRect(
+                                    image, four_point_transform(image, [box][0]), box, x, y)
 
                             if (result):
                                 cv2.drawContours(
                                     contourImage, [cnt], -1, (0, 255, 0), 2)
-                            if (self.__imgOutput):
-                                cv2.drawContours(contourImage, [box], 0, (0, 0, 255), 1)
-                                M = cv2.moments(cnt)
-                                cX = int(M["m10"] / M["m00"])
-                                cY = int(M["m01"] / M["m00"])
-                                cv2.putText(contourImage, str(
-                                    self.cntNum), (cX - 30, cY - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                                if (self.__imgOutput):
+                                    cv2.drawContours(
+                                        contourImage, [box], 0, (0, 0, 255), 1)
+                                    M = cv2.moments(cnt)
+                                    cX = int(M["m10"] / M["m00"])
+                                    cY = int(M["m01"] / M["m00"])
+                                    cv2.putText(contourImage, str(
+                                        self.cntNum), (cX - 30, cY - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-                                self.logger.debug("[" + str(self.cntNum) + "] SideRatio: " + str(sideRatio) +
-                                            " AreaRatio: " + str(rectContAreaRatio) +
-                                            " ContArea: " + str(cArea) +
-                                            " RectArea: " + str(rArea) +
-                                            " AbsSize: " + str(absoluteSizeToImageRatio) +
-                                            " CntPoints: " + str(len(approx)) + 
-                                            " Size: " + str(w) +"x"+str(h)) 
+                                    self.logger.debug("[" + str(self.cntNum) + "] SideRatio: " + str(sideRatio) +
+                                                      " AreaRatio: " + str(rectContAreaRatio) +
+                                                      " ContArea: " + str(cArea) +
+                                                      " RectArea: " + str(rArea) +
+                                                      " AbsSize: " + str(absoluteSizeToImageRatio) +
+                                                      " CntPoints: " + str(len(approx)) +
+                                                      " Size: " + str(w) + "x"+str(h))
 
             if (self.__imgOutput):  # hsv img output
                 hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
                 cv2.namedWindow('contourImage')
                 cv2.setMouseCallback('contourImage', self.pick_color)
-                #self.showImg("hsv", hsv)
+                # self.showImg("hsv", hsv)
 
-            self.showImg("contourImage", np.hstack((contourImage, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))))
+            self.showImg("contourImage", np.hstack(
+                (contourImage, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))))
             if (self.state.RecordImage):
                 self.recordNum += 1
-                cv2.imwrite(os.path.join(self.recordFolder, str(self.recordNum) + ".jpg"), image)
+                cv2.imwrite(os.path.join(self.recordFolder,
+                                         str(self.recordNum) + ".jpg"), image)
 
     # Singleton
     __inst = None
