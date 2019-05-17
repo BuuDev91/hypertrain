@@ -45,34 +45,34 @@ def hyperloop():
     communication = Communication(logger)
     acceleration = Acceleration(logger)
 
+    # reads any input incoming over UART / i2c / GPIO
+    communication.readThreadStart()
+    # measure acceleration
+    acceleration.measureThreadStart()
+
     # program loop
     while True:
         try:
-            # reads any input incoming over UART / i2c / GPIO
-            communication.read()
-
-            # measure acceleration
-            acceleration.measure()
-
             if ((not state.Stopped and state.Loaded) or state.Standalone):
-                # capture image from videostream and analyze
-                camera.capture()
+
+                if (state.StopSignalNum == 0 or state.Approach or state.Standalone):
+                    # capture image from videostream and analyze
+                    camera.capture()
 
                 if (state.StopSignalNum == 0):
-                    state.AccelerationPercent = 25
-                    communication.sendSpeedPercent(state.AccelerationPercent)
+                    communication.sendSpeedPercent(25)
                 # if we found our stop signal, announce it
                 elif (state.StopSignalNum != 0 and not state.StopSignalAnnounced):
                     communication.buzzSignalNumber(state.StopSignalNum)
                     communication.sendSpeedPercent(100)
                     state.setStopSignalAnnounced(True)
-                # if we are close to passing round 2, we deccelerate to X percent
-                elif (state.LapSignalCount >= 3 and not state.ApproachStop):
-                    communication.sendSpeedPercent(10)
+                # if we covered the same distance again, we deccelerate to X percent
+                elif (state.CoveredDistance >= state.StopSignalDistance * 2 and not state.Approaching):
+                    communication.sendSpeedPercent(25)
+                    state.Approaching = True
+                elif (state.StopSignalNum == state.CurrentNum and not state.ApproachStop):
                     communication.sendApproachStop()
-                elif (state.LapSignalCount < 2):
-                    state.AccelerationPercent = 100
-                    communication.sendSpeedPercent(state.AccelerationPercent)
+                    state.ApproachStop = True
 
             if (cv2.waitKey(1) & 0xFF) == ord('q'):
                 break
@@ -84,6 +84,10 @@ def hyperloop():
             traceback.print_exc(limit=3, file=sys.stdout)
 
     communication.sendStartStop('stop')
+    time.sleep(1)
+    logger.info('Aborting running threads')
+    communication.readThreadStop()
+    acceleration.measureThreadStop()
     logger.info('Stopped')
 
 

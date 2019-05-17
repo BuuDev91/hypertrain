@@ -1,5 +1,7 @@
 import serial
 import json
+import threading
+import time
 
 from gpiozero import LED, Button, Buzzer
 
@@ -22,7 +24,7 @@ class Communication:
     UART to communicate with Arduino, with a serialized JSON Object. See /UART/communication.schema.json.
     GPIO 4  = Buzzer
     GPIO 12 = Start button
-    GPIO 26 = LED 
+    GPIO 26 = LED
     """
 
     class __impl:
@@ -41,9 +43,12 @@ class Communication:
             self.button = Button(12, True)
             self.button.when_pressed = lambda: self.toggleHypertrain()
 
+            self.thread = threading.Thread(target=self.readThread)
+            self.threadStop = False
+
         def toggleHypertrain(self):
             self.state.Stopped = not self.state.Stopped
-            #self.state.Loaded = not self.state.Loaded
+            # self.state.Loaded = not self.state.Loaded
             self.logger.info(
                 "Button pressed, new state Stopped: " + str(self.state.Stopped))
             self.led.blink(1, 1, 1)
@@ -66,7 +71,7 @@ class Communication:
             self.write(json.dumps(data))
 
         def sendSpeedPercent(self, acceleration):
-            if (self.state.AccelerationPercent != self.state.LastAccelerationPercent):
+            if (acceleration != self.state.LastAccelerationPercent):
                 self.state.LastAccelerationPercent = acceleration
                 data = {}
                 data['sender'] = 'raspberry'
@@ -77,14 +82,23 @@ class Communication:
         def buzzSignalNumber(self, num):
             self.buzzer.beep(1, 1, num)
 
+        def readThreadStart(self):
+            self.thread.start()
+
+        def readThreadStop(self):
+            self.threadStop = True
+
+        def readThread(self):
+            while (not self.threadStop):
+                self.read()
+                time.sleep(self.state.ThreadSleepingThreshold)
+
         def read(self):
             incoming = ""
             if (self.serial.in_waiting > 0):
-
                 while not "}" in incoming:
                     incoming += self.serial.read(self.serial.inWaiting()
                                                  ).decode('ascii')
-
 
                 incomingMsgs = incoming.splitlines()
                 for incoming in incomingMsgs:
@@ -101,10 +115,13 @@ class Communication:
                                         self.state.Loaded = True
                                 if (jsonObj["action"] == "speed"):
                                     continue
-                                if (jsonObj["action"] == "way"):
+                                if (jsonObj["action"] == "way" and jsonObj["payload"]):
+                                    self.state.CoveredDistance = int(
+                                        jsonObj["payload"])
                                     continue
                         except AttributeError as e:
-                            self.logger.error("AttributeError in JSON: " + str(e))
+                            self.logger.error(
+                                "AttributeError in JSON: " + str(e))
                         except Exception as e:
                             self.logger.error("Unknown message: " + str(e))
 

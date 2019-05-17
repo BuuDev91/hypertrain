@@ -6,7 +6,7 @@ import time
 import cv2
 import sys
 import imutils
-import pytesseract
+
 from lib.logger import Logger
 from lib.state import State, Signal
 from lib.filter import Filter
@@ -83,16 +83,7 @@ class Camera:
             self.tesserOCR(np.zeros((1, 1, 3), np.uint8))
 
         def tesserOCR(self, image):
-            pil_image = Image.fromarray(image)
-            # oem 1 = LTSM, psm 10 = single char
-            """ output = pytesseract.image_to_string(
-                pil_image, lang="digits", config="--oem 1 --psm 10")
-            data = pytesseract.image_to_data(
-                pil_image, lang="digits", config="--oem 1 --psm 10")
-            if output:
-                print(data)
-            return output """
-            self.tesseract.SetImage(pil_image)
+            self.tesseract.SetImage(Image.fromarray(image))
             return self.tesseract.GetUTF8Text(), self.tesseract.AllWordConfidences()
 
         def dominantColor(self, img, clusters=2):
@@ -209,16 +200,16 @@ class Camera:
                 output = output.replace(" ", "")
 
                 if output.isdigit() and 0 < int(output) < 10:
-                    self.showImg("opt " + str(self.cntNum),
-                                 np.hstack((resizedWarp, cv2.cvtColor(optimized, cv2.COLOR_GRAY2BGR))))
+                    """ self.showImg("opt " + str(self.cntNum),
+                                 np.hstack((resizedWarp, cv2.cvtColor(optimized, cv2.COLOR_GRAY2BGR)))) """
                     if y <= self.signalThresholdY:
                         self.logger.info(
-                            "Stop Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y))
+                            "Stop Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y) + " Confidence: " + str(confidence[0]) + "%")
                         self.state.setStopSignal(int(output))
                         return "S: " + output
                     elif self.state.StopSignalNum != 0:
                         self.logger.info(
-                            "Info Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y))
+                            "Info Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y) + " Confidence: " + str(confidence[0]) + "%")
                         self.state.setCurrentSignal(
                             Signal.NUM, int(output))
                         return "I: " + output
@@ -258,7 +249,7 @@ class Camera:
             # focus only on the part of the image, where a signal could occur
             # image = image[int(image.shape[0] * 0.2):int(image.shape[0] * 0.8), 0:int(image.shape[1]*0.666)]
 
-            mask = self.filter.autoCanny(image, 0.66, 3)
+            mask = self.filter.autoCanny(image, 2, 3)
 
             # get a list of contours in the mask, chaining to just endpoints
             cnts = imutils.grab_contours(cv2.findContours(
@@ -286,7 +277,7 @@ class Camera:
                         (x, y, w, h) = cv2.boundingRect(approx)
 
                         # limit viewing range
-                        if (y <= image_height * 0.2 or x >= image_width * 0.7):
+                        if (y <= image_height * 0.2 or x >= image_width * 0.8):
                             continue
 
                         if (w <= 5 or h <= 5):
@@ -328,8 +319,8 @@ class Camera:
                                     box = cv2.boxPoints(rect)
                                     box = np.int0(box)
 
-                                """ cv2.drawContours(
-                                    contourImage, [box], 0, (0, 255, 0), 1) """
+                                cv2.drawContours(
+                                    contourImage, [box], 0, (0, 255, 0), 1)
 
                                 warp = four_point_transform(image, [box][0])
 
@@ -340,6 +331,8 @@ class Camera:
                             if (self.__imgOutput):
                                 cv2.drawContours(
                                     contourImage, [box], 0, (0, 0, 255), 1)
+                                cv2.drawContours(
+                                    contourImage, [cnt], -1, (0, 0, 255), 2)
                                 """ M = cv2.moments(cnt)
                                 cX = int(M["m10"] / M["m00"])
                                 cY = int(M["m01"] / M["m00"])

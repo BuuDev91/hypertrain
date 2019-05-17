@@ -26,6 +26,7 @@ class State:
             self.StopSignalNum = 0
             self.StopSignalTimeStamp = None
             self.StopSignalAnnounced = False
+            self.StopSignalDistance = 0
 
             self.LastLapSignalTimeStamp = None
             self.LapSignalCount = 0
@@ -34,13 +35,18 @@ class State:
             self.AccelerationPercent = 0
             self.LastAccelerationPercent = 0
 
+            self.CoveredDistance = 0
+
             self.Loaded = False
+            self.Approaching = False
             self.ApproachStop = False
             self.Stopped = True
 
             self.Standalone = False
             self.NoImageTransfer = False
             self.RecordImage = False
+
+            self.ThreadSleepingThreshold = 0.1
 
             # acceleration parameters
             self.x = 0
@@ -67,6 +73,7 @@ class State:
         def setStopSignal(self, num):
             self.StopSignalNum = num
             self.StopSignalTimeStamp = time.time()
+            self.StopSignalDistance = self.CoveredDistance
 
         def setStopSignalAnnounced(self, announced):
             self.StopSignalAnnounced = announced

@@ -1,6 +1,9 @@
 # MMA8452Q i2c
 import smbus
 
+import threading
+import time
+
 from lib.state import State
 
 
@@ -20,6 +23,9 @@ class Acceleration:
             self.z = 0.0
             self.busReady = True
             self.state = State()
+
+            self.thread = threading.Thread(target=self.measureThread)
+            self.threadStop = False
 
             try:
                 self.__initBus__()
@@ -43,8 +49,18 @@ class Acceleration:
 
             self.logger.debug("Acceleration module ready")
 
-        def measure(self):
+        def measureThreadStart(self):
+            self.thread.start()
 
+        def measureThreadStop(self):
+            self.threadStop = True
+
+        def measureThread(self):
+            while (not self.threadStop):
+                self.measure()
+                time.sleep(self.state.ThreadSleepingThreshold)
+
+        def measure(self):
             # MMA8452Q address, 0x1d
             # Read data back from 0x00(0), 7 bytes
             # Status register, X-Axis MSB, X-Axis LSB, Y-Axis MSB, Y-Axis LSB, Z-Axis MSB, Z-Axis LSB
