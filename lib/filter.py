@@ -80,10 +80,10 @@ class Filter:
 
             return mag.max(axis=0).astype(np.uint8)
 
-        def autoCanny(self, img, sigma=0.33):
+        def autoCanny(self, img, sigma=1.5, gaussian=5):
 
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            image = cv2.GaussianBlur(gray, (5, 5), sigma)
+            image = cv2.GaussianBlur(gray, (gaussian, gaussian), sigma)
 
             # compute the median of the single channel pixel intensities
             v = np.median(image)
