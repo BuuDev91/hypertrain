@@ -1,4 +1,5 @@
 import numpy as np
+import numexpr as ne
 
 import os
 import datetime
@@ -79,7 +80,7 @@ class Camera:
                 cv2.imshow(window, image)
 
         def warmup(self):
-            time.sleep(1)
+            time.sleep(2.0)
             self.tesserOCR(np.zeros((1, 1, 3), np.uint8))
 
         def tesserOCR(self, image):
@@ -87,70 +88,32 @@ class Camera:
             return self.tesseract.GetUTF8Text(), self.tesseract.AllWordConfidences()
 
         def dominantColor(self, img, clusters=2):
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            data = np.reshape(img, (-1, 3))
+            data = np.float32(data)
 
-            # reshaping to a list of pixels
-            img = img.reshape((img.shape[0] * img.shape[1], 3))
-
-            # using k-means to cluster pixels
-            kmeans = KMeans(n_clusters=clusters)
-            kmeans.fit(img)
-
-            centroids = kmeans.cluster_centers_
-
-            # create a histogram and label each section
-            numLabels = np.arange(0, len(np.unique(kmeans.labels_)) + 1)
-            (hist, _) = np.histogram(kmeans.labels_, bins=numLabels)
-
-            # normalize the histogram, such that it sums to one
-            hist = hist.astype("float")
-            hist /= hist.sum()
-
-            # plot
-            # bar = np.zeros((50, 300, 3), dtype="uint8")
-            # startX = 0
-
-            distinctColors = 0
-            percent = 0.0
-            color = None
-            for (pcnt, clr) in zip(hist, centroids):
-                distinctColors += 1
-                if (percent < pcnt):
-                    percent = pcnt
-                    color = clr
-                # endX = startX + (percent * 300)
-                # cv2.rectangle(bar, (int(startX), 0), (int(endX), 50),
-                #              color.astype("uint8").tolist(), -1)
-                # startX = endX
-
-            # self.showImg("histogram", bar)
-
-            rgb = np.array(color.astype("uint8").tolist())
-
-            # self.logger.info("Cnt: " + str(self.cntNum) +
-            #                 " " + str(rgb) + " " + str(percent)+"%")
-            return rgb, percent*100, distinctColors
+            criteria = (cv2.TERM_CRITERIA_EPS +
+                        cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+            flags = cv2.KMEANS_RANDOM_CENTERS
+            _, _, centers = cv2.kmeans(data, 1, None, criteria, 10, flags)
+            return centers[0].astype(np.int32)
 
         def analyzeRect(self, image, warped, box, x, y):
-            # dominantColor = np.array(self.dominantColor(warped))
             # find amount of color blue in warped area, assuming over X% is the lap signal
             if (self.getAmountOfColor(warped, Colors.lower_blue_color, Colors.upper_blue_color, True) > 0.1):
-                # if (cv2.inRange(dominantColor, np.array([80, 40, 20]), np.array([120, 60, 50]))):
-                # cv2.putText(image, "Rundensignal", (100, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
                 self.logger.info("Rundensignal")
                 self.state.setCurrentSignal(Signal.LAP)
                 return "Rundensignal"
 
         def analyzeSquare(self, image, warped, box, x, y):
 
-            dominantColor, percent, _ = self.dominantColor(warped, 3)
-
-            color = ''
+            #dominantColor, percent, _ = self.dominantColor(warped, 3)
+            dominantColor = self.dominantColor(warped, 3)
+            color = 'k'
             # find amount of color black in warped area, assuming over X% is a numeric signal
-            if ((dominantColor <= 70).all() and percent > 60):
+            if ((dominantColor <= 70).all()):
                 color = "Black"
 
-            elif ((dominantColor >= 160).all() and (dominantColor <= 250).all() and percent > 60):
+            elif ((dominantColor >= 180).all()):
                 color = "White"
 
             if (color):
@@ -192,7 +155,7 @@ class Camera:
                 output, confidence = self.tesserOCR(optimized)
 
                 # if the resulting text is below 90% confidence threshold, we skip it
-                if not output or confidence[0] < 90:
+                if not output or confidence[0] < 95:
                     return False
 
                 # clean up output from tesseract
@@ -204,12 +167,12 @@ class Camera:
                                  np.hstack((resizedWarp, cv2.cvtColor(optimized, cv2.COLOR_GRAY2BGR)))) """
                     if y <= self.signalThresholdY:
                         self.logger.info(
-                            "Stop Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y) + " Confidence: " + str(confidence[0]) + "%")
+                            "Stop Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y) + " Confidence: " + str(confidence[0]) + "%" + " DominantColor: " + str(dominantColor))
                         self.state.setStopSignal(int(output))
                         return "S: " + output
                     elif self.state.StopSignalNum != 0:
                         self.logger.info(
-                            "Info Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y) + " Confidence: " + str(confidence[0]) + "%")
+                            "Info Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y) + " Confidence: " + str(confidence[0]) + "%" + " DominantColor: " + str(dominantColor))
                         self.state.setCurrentSignal(
                             Signal.NUM, int(output))
                         return "I: " + output
@@ -239,7 +202,8 @@ class Camera:
                 image = savedImg
             else:
                 image = self.__vs.read()
-                image = imutils.rotate(image, angle=0)
+                if (self.state.InvertCamera):
+                    image = imutils.rotate(image, angle=180)
 
             image_height = np.size(image, 0)
             image_width = np.size(image, 1)
@@ -253,7 +217,7 @@ class Camera:
 
             # get a list of contours in the mask, chaining to just endpoints
             cnts = imutils.grab_contours(cv2.findContours(
-                mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE))
+                mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE))
 
             # only proceed if at least one contour was found
             if len(cnts) > 0:
@@ -319,8 +283,8 @@ class Camera:
                                     box = cv2.boxPoints(rect)
                                     box = np.int0(box)
 
-                                cv2.drawContours(
-                                    contourImage, [box], 0, (0, 255, 0), 1)
+                                """ cv2.drawContours(
+                                    contourImage, [box], 0, (0, 255, 0), 1) """
 
                                 warp = four_point_transform(image, [box][0])
 

@@ -26,12 +26,15 @@ def hyperloop():
         if (p == "--standalone" or p == "-s"):
             state.Standalone = True
             logger.info("Standalone mode activated")
-        elif (p == "--nocamera" or p == "-nc"):
+        elif (p == "--nocamera" or p == "-n"):
             state.NoImageTransfer = True
             logger.info("Camera image transfer X11 disabled")
         elif (p == "--record" or p == "-r"):
             state.RecordImage = True
             logger.info("Record mode activated")
+        elif (p == "--invert" or p == "-i"):
+            state.InvertCamera = True
+            logger.info("Inverted camera activated")
 
     vs = PiVideoStream(resolution=(480, 368), framerate=32).start()
     piCamera = vs.camera
@@ -55,7 +58,7 @@ def hyperloop():
         try:
             if ((not state.Stopped and state.Loaded) or state.Standalone):
 
-                if (state.StopSignalNum == 0 or state.Approach or state.Standalone):
+                if (state.StopSignalNum == 0 or state.Approaching or state.Standalone):
                     # capture image from videostream and analyze
                     camera.capture()
 

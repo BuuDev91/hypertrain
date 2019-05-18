@@ -43,6 +43,7 @@ class State:
             self.Stopped = True
 
             self.Standalone = False
+            self.InvertCamera = False
             self.NoImageTransfer = False
             self.RecordImage = False
 
