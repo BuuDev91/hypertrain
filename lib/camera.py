@@ -32,9 +32,6 @@ class Colors:
     lower_black_hsv = np.array([0, 0, 0])
     upper_black_hsv = np.array([180, 255, 60])
 
-    lower_black_rgb = np.array([0, 0, 0])
-    upper_black_rgb = np.array([70, 70, 70])
-
     lower_blue_color = np.array([94, 80, 2])
     upper_blue_color = np.array([126, 255, 255])
 
@@ -56,8 +53,6 @@ class Camera:
             self.state = State()
             self.tesseract = PyTessBaseAPI(
                 psm=PSM.SINGLE_CHAR, oem=OEM.LSTM_ONLY, lang="digits")
-            #self.tesseract.SetVariable("classify_bln_numeric_mode", "1")
-            #self.tesseract.SetVariable("tessedit_char_whitelist", "123456789")
             self.filter = Filter()
 
             self.signalThresholdY = 150
@@ -107,75 +102,72 @@ class Camera:
         def analyzeSquare(self, image, warped, box, x, y):
 
             #dominantColor, percent, _ = self.dominantColor(warped, 3)
-            dominantColor = self.dominantColor(warped, 3)
-            color = 'k'
-            # find amount of color black in warped area, assuming over X% is a numeric signal
-            if ((dominantColor <= 70).all()):
-                color = "Black"
+            # dominantColor = self.dominantColor(
+            #    cv2.cvtColor(warped, cv2.COLOR_BGR2HSV), 3)
+            """  color = 'k'
+             # find amount of color black in warped area, assuming over X% is a numeric signal
+             if ((dominantColor <= 70).all()):
+                 color = 'Black'
 
-            elif ((dominantColor >= 180).all()):
-                color = "White"
+             elif ((dominantColor >= 180).all()):
+                 color = 'White'
 
-            if (color):
-                resizedWarp = cv2.resize(
-                    warped, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+             if (color): """
+            resizedWarp = cv2.resize(
+                warped, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
 
-                optimized = cv2.cvtColor(resizedWarp, cv2.COLOR_BGR2GRAY)
+            # gray
+            optimized = cv2.cvtColor(resizedWarp, cv2.COLOR_BGR2GRAY)
 
-                # cropValue: amount of the frame to be cropped out
-                """ cropValue = 0
-                optimized = optimized[cropValue:optimized.shape[0] -
-                                      cropValue, cropValue: optimized.shape[1] - cropValue] """
+            # blur
+            optimized = cv2.GaussianBlur(optimized, (5, 5), 0)
 
-                # blur
-                optimized = cv2.GaussianBlur(optimized, (5, 5), 0)
+            # binary image
+            optimized = cv2.threshold(
+                optimized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
-                # binary image
-                optimized = cv2.threshold(
-                    optimized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+            # binary inversion if dominant color is black
+            """ if (color == 'Black'):
+                optimized = cv2.bitwise_not(optimized) """
 
-                # binary inversion if dominant color is black
-                if (color == "Black"):
-                    optimized = cv2.bitwise_not(optimized)
+            # now check the frame (1px) of the image.. there shouldn't be any noise since its a clean signal background
+            h, w = optimized.shape[0:2]
+            clean = optimized[0, 0]
+            for iFrame in range(0, 2):
+                for iHeight in range(h):
+                    if not(optimized[iHeight, iFrame] == clean) or not(optimized[iHeight, w - 1 - iFrame] == clean):
+                        return False
+                for iWidth in range(w):
+                    # or not(optimized[h - iFrame, iWidth])
+                    if not(optimized[iFrame, iWidth] == clean):
+                        return False
 
-                # now check the frame (1px) of the image.. there shouldn't be any noise since its a clean signal background
-                h, w = optimized.shape[0:2]
+            # cv2.imwrite("records/opt/" + str(self.cntNum) + ".jpg", optimized)
 
-                for iFrame in range(1, 2):
-                    for iHeight in range(h):
-                        if not(optimized[iHeight, iFrame]) or not(optimized[iHeight, w - iFrame]):
-                            return False
-                    for iWidth in range(w):
-                        # or not(optimized[h - iFrame, iWidth])
-                        if not(optimized[iFrame, iWidth]):
-                            return False
+            output, confidence = self.tesserOCR(optimized)
 
-                # cv2.imwrite("records/opt/" + str(self.cntNum) + ".jpg", optimized)
+            # if the resulting text is below X% confidence threshold, we skip it
+            if not output or confidence[0] < 95:
+                return False
 
-                output, confidence = self.tesserOCR(optimized)
+            # clean up output from tesseract
+            output = output.replace('\n', '')
+            output = output.replace(' ', '')
 
-                # if the resulting text is below 90% confidence threshold, we skip it
-                if not output or confidence[0] < 95:
-                    return False
-
-                # clean up output from tesseract
-                output = output.replace("\n", "")
-                output = output.replace(" ", "")
-
-                if output.isdigit() and 0 < int(output) < 10:
-                    """ self.showImg("opt " + str(self.cntNum),
-                                 np.hstack((resizedWarp, cv2.cvtColor(optimized, cv2.COLOR_GRAY2BGR)))) """
-                    if y <= self.signalThresholdY:
-                        self.logger.info(
-                            "Stop Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y) + " Confidence: " + str(confidence[0]) + "%" + " DominantColor: " + str(dominantColor))
-                        self.state.setStopSignal(int(output))
-                        return "S: " + output
-                    elif self.state.StopSignalNum != 0:
-                        self.logger.info(
-                            "Info Signal OCR: " + output + " X: " + str(x) + " Y: " + str(y) + " Confidence: " + str(confidence[0]) + "%" + " DominantColor: " + str(dominantColor))
-                        self.state.setCurrentSignal(
-                            Signal.NUM, int(output))
-                        return "I: " + output
+            if output.isdigit() and 0 < int(output) < 10:
+                """ self.showImg("opt " + str(self.cntNum),
+                                np.hstack((resizedWarp, cv2.cvtColor(optimized, cv2.COLOR_GRAY2BGR)))) """
+                if y <= self.signalThresholdY:
+                    self.logger.info(
+                        'Stop Signal OCR: ' + output + ' X: ' + str(x) + ' Y: ' + str(y) + ' Confidence: ' + str(confidence[0]) + '%')  # + ' DC: ' + str(dominantColor))
+                    self.state.setStopSignal(int(output))
+                    return 'S: ' + output
+                elif self.state.StopSignalNum != 0:
+                    self.logger.info(
+                        'Info Signal OCR: ' + output + ' X: ' + str(x) + ' Y: ' + str(y) + ' Confidence: ' + str(confidence[0]) + '%')  # + ' DC: ' + str(dominantColor))
+                    self.state.setCurrentSignal(
+                        Signal.NUM, int(output))
+                    return 'I: ' + output
 
         def getAmountOfColor(self, img, lowerColor, upperColor, convert2hsv=True):
             if (convert2hsv):
@@ -247,6 +239,10 @@ class Camera:
                         if (w <= 5 or h <= 5):
                             continue
 
+                        # we are in approaching mode, thus we only care for the lower signals <= threshold
+                        if ((self.state.Approaching and y <= self.signalThresholdY) and not self.state.Standalone):
+                            continue
+
                         sideRatio = w / float(h)
 
                         absoluteSizeToImageRatio = (
@@ -266,11 +262,10 @@ class Camera:
                         result = None
 
                         # is the rectangle sideways, check for lap signal
-                        if (h*2 < w and y <= self.signalThresholdY and rectContAreaRatio >= 80):
-                            result = self.analyzeRect(
-                                image, four_point_transform(image, [box][0]), box, x, y)
+                        # if (h*2 < w and y <= self.signalThresholdY and rectContAreaRatio >= 80):
+                        #result = self.analyzeRect(image, four_point_transform(image, [box][0]), box, x, y)
                         # find all contours looking like a signal with minimum area (1%)
-                        elif absoluteSizeToImageRatio >= 0.01:
+                        if absoluteSizeToImageRatio >= 0.01:
                             # is it approx a square, or standing rect? then check for info or stop signal
                             if 0.2 <= sideRatio <= 1.1:
                                 # transform ROI
@@ -293,10 +288,17 @@ class Camera:
 
                         if (result):
                             if (self.__imgOutput):
+                                color = None
+                                if (y >= self.signalThresholdY):
+                                    color = (0, 0, 255)
+                                else:
+                                    color = (255, 0, 0)
+
                                 cv2.drawContours(
-                                    contourImage, [box], 0, (0, 0, 255), 1)
+                                    contourImage, [box], 0, color, 1)
                                 cv2.drawContours(
-                                    contourImage, [cnt], -1, (0, 0, 255), 2)
+                                    contourImage, [cnt], -1, color, 2)
+
                                 """ M = cv2.moments(cnt)
                                 cX = int(M["m10"] / M["m00"])
                                 cY = int(M["m01"] / M["m00"])

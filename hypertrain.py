@@ -53,6 +53,8 @@ def hyperloop():
     # measure acceleration
     acceleration.measureThreadStart()
 
+    fps = FPS().start()
+
     # program loop
     while True:
         try:
@@ -61,6 +63,7 @@ def hyperloop():
                 if (state.StopSignalNum == 0 or state.Approaching or state.Standalone):
                     # capture image from videostream and analyze
                     camera.capture()
+                    fps.update()
 
                 if (state.StopSignalNum == 0):
                     communication.sendSpeedPercent(25)
@@ -73,9 +76,11 @@ def hyperloop():
                 elif (state.CoveredDistance >= state.StopSignalDistance * 2 and not state.Approaching):
                     communication.sendSpeedPercent(25)
                     state.Approaching = True
+                    logger.info("Approaching lower signal")
                 elif (state.StopSignalNum == state.CurrentNum and not state.ApproachStop):
                     communication.sendApproachStop()
                     state.ApproachStop = True
+                    logger.info("Approaching stop")
 
             if (cv2.waitKey(1) & 0xFF) == ord('q'):
                 break
@@ -85,9 +90,11 @@ def hyperloop():
         except Exception as e:
             logger.logError(e)
             traceback.print_exc(limit=3, file=sys.stdout)
+    fps.stop()
 
     communication.sendStartStop('stop')
     time.sleep(1)
+    logger.info('FPS: ' + str(fps.fps()))
     logger.info('Aborting running threads')
     communication.readThreadStop()
     acceleration.measureThreadStop()

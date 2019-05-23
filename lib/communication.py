@@ -2,6 +2,9 @@ import serial
 import json
 import threading
 import time
+import regex
+
+from json import JSONDecoder
 
 from gpiozero import LED, Button, Buzzer
 
@@ -43,6 +46,9 @@ class Communication:
             self.button = Button(12, True)
             self.button.when_pressed = lambda: self.toggleHypertrain()
 
+            self.buffer = ''
+            self.jsonParsePattern = regex.compile(r'\{(?:[^{}]|(?R))*\}')
+
             self.thread = threading.Thread(target=self.readThread)
             self.threadStop = False
 
@@ -80,7 +86,7 @@ class Communication:
                 self.write(json.dumps(data))
 
         def buzzSignalNumber(self, num):
-            self.buzzer.beep(1, 1, num)
+            self.buzzer.beep(0.3, 0.3, num)
 
         def readThreadStart(self):
             self.thread.start()
@@ -94,41 +100,61 @@ class Communication:
                 time.sleep(self.state.ThreadSleepingThreshold)
 
         def read(self):
-            incoming = ""
             if (self.serial.in_waiting > 0):
-                while not "}" in incoming:
-                    incoming += self.serial.read(self.serial.inWaiting()
-                                                 ).decode('ascii')
+                time.sleep(0.1)
+                while self.serial.inWaiting():
+                    self.buffer += self.serial.read(self.serial.inWaiting()
+                                                    ).decode('ascii')
 
-                incomingMsgs = incoming.splitlines()
-                for incoming in incomingMsgs:
+                for incoming in self.extractJSONObjects(self.buffer):
                     if incoming:
-                        self.logger.info("Receiving: " + incoming)
-                        jsonObj = None
-                        try:
-                            jsonObj = json.loads(incoming)
-                            if (jsonObj["sender"] == "arduino"):
-                                if (jsonObj["action"] == "loaded"):
-                                    self.led.blink(1, 1, 1)
-                                    self.buzzSignalNumber(1)
-                                    if (not self.state.Loaded):
-                                        self.state.Loaded = True
-                                if (jsonObj["action"] == "speed"):
-                                    continue
-                                if (jsonObj["action"] == "way" and jsonObj["payload"]):
-                                    self.state.CoveredDistance = int(
-                                        jsonObj["payload"])
-                                    continue
-                        except AttributeError as e:
-                            self.logger.error(
-                                "AttributeError in JSON: " + str(e))
-                        except Exception as e:
-                            self.logger.error("Unknown message: " + str(e))
+                        self.parse(incoming)
 
         def write(self, message):
             if (message):
                 self.logger.info("Sending: " + message)
                 self.serial.write(message.encode())
+
+        def parse(self, message):
+            jsonObj = None
+            try:
+                jsonObj = json.loads(message)
+                if (jsonObj["sender"] == "arduino"):
+                    if (jsonObj["action"] == "loaded"):
+                        self.led.blink(1, 1, 1)
+                        self.buzzSignalNumber(1)
+                        if (not self.state.Loaded):
+                            self.state.Loaded = True
+                    if (jsonObj["action"] == "speed"):
+                        return
+                    if (jsonObj["action"] == "way" and jsonObj["payload"]):
+                        self.state.CoveredDistance = int(
+                            jsonObj["payload"])
+                        return
+
+                self.logger.info("Receiving: " + message)
+
+            except AttributeError as e:
+                self.logger.error(
+                    "AttributeError in JSON: " + str(e))
+            except Exception as e:
+                self.logger.error("Unknown message: " + str(e))
+                self.logger.error(message)
+
+        def extractJSONObjects(self, text, decoder=JSONDecoder()):
+            pos = 0
+            while True:
+                match = text.find('{', pos)
+                if match == -1:
+                    break
+                try:
+                    result, index = decoder.raw_decode(text[match:])
+                    yield result
+                    pos = match + index
+                    # now strip the match from our buffer
+                    self.buffer = self.buffer[pos:]
+                except ValueError:
+                    pos = match + 1
 
     # Singleton
     __inst = None
