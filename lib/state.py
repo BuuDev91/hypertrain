@@ -31,7 +31,7 @@ class State:
 
             self.LastLapSignalTimeStamp = None
             self.LapSignalCount = 0
-            self.LapSignalTimeThreshold = 5
+            self.LapSignalTimeThreshold = 3
 
             self.AccelerationPercent = 0
             self.LastAccelerationPercent = 0
@@ -69,7 +69,7 @@ class State:
                 self.LastLapSignalTimeStamp = datetime.timestamp(
                     datetime.now())
 
-            # if seen lap signal within 5 seconds again, dont count it as a new lap
+            # if seen lap signal within X seconds again, dont count it as a new lap
             if ((self.LastLapSignalTimeStamp + self.LapSignalTimeThreshold) <= datetime.timestamp(datetime.now())):
                 self.LastLapSignalTimeStamp = datetime.timestamp(
                     datetime.now())

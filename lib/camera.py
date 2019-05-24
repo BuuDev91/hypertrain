@@ -56,6 +56,7 @@ class Camera:
             self.filter = Filter()
 
             self.signalThresholdY = 160
+            self.LAPPatternSesibility = 5
 
             self.recordStamp = time.strftime(self.logger.timeFormat)
             self.recordNum = 0
