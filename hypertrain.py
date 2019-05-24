@@ -2,7 +2,7 @@ from lib.camera import Camera
 from lib.logger import Logger
 from lib.communication import Communication
 from lib.acceleration import Acceleration
-from lib.state import State
+from lib.state import State, Signal
 
 import cv2
 import json
@@ -32,6 +32,9 @@ def hyperloop():
         elif (p == "--record" or p == "-r"):
             state.RecordImage = True
             logger.info("Record mode activated")
+        elif (p == "--measure" or p == "-m"):
+            state.MeasureMode = True
+            logger.info("Measure mode activated")
         elif (p == "--invert" or p == "-i"):
             state.InvertCamera = True
             logger.info("Inverted camera activated")
@@ -60,25 +63,30 @@ def hyperloop():
         try:
             if ((not state.Stopped and state.Loaded) or state.Standalone):
 
-                if (state.StopSignalNum == 0 or state.Approaching or state.Standalone):
-                    # capture image from videostream and analyze
-                    camera.capture()
-                    fps.update()
+                # if (state.StopSignalNum == 0 or (state.Approaching and not state.StopSignalNum == 0) or state.Standalone):
+                # capture image from videostream and analyze
+                camera.capture()
+                fps.update()
 
-                if (state.StopSignalNum == 0):
+                if (state.StopSignalNum == 0 and state.LapSignalCount < 2 and not state.Approaching == Signal.UPPER):
                     communication.sendSpeedPercent(25)
+                    state.Approaching = Signal.UPPER
+                    logger.info("Approaching upper signal")
                 # if we found our stop signal, announce it
                 elif (state.StopSignalNum != 0 and not state.StopSignalAnnounced):
-                    communication.buzzSignalNumber(state.StopSignalNum)
                     communication.sendSpeedPercent(100)
+                    communication.buzzSignalNumber(state.StopSignalNum)
                     state.setStopSignalAnnounced(True)
+                    state.Approaching = Signal.LAP
+                    logger.info("Approaching lap signal")
                 # if we covered the same distance again, we deccelerate to X percent
-                elif (state.CoveredDistance >= state.StopSignalDistance * 2 and not state.Approaching):
+                elif (state.StopSignalAnnounced and state.CoveredDistance >= 23*100 and not state.Approaching == Signal.LOWER):
                     communication.sendSpeedPercent(25)
-                    state.Approaching = True
+                    state.Approaching = Signal.LOWER
                     logger.info("Approaching lower signal")
-                elif (state.StopSignalNum == state.CurrentNum and not state.ApproachStop):
+                elif (state.StopSignalAnnounced and state.StopSignalNum == state.CurrentNum and not state.ApproachStop):
                     communication.sendApproachStop()
+                    communication.sendSpeedPercent(25)
                     state.ApproachStop = True
                     logger.info("Approaching stop")
 

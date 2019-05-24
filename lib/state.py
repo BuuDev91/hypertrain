@@ -5,8 +5,9 @@ from enum import Enum
 
 class Signal(Enum):
     NONE = 0
-    NUM = 1
-    LAP = 2
+    LOWER = 1
+    UPPER = 2
+    LAP = 4
 
 
 class State:
@@ -38,7 +39,7 @@ class State:
             self.CoveredDistance = 0
 
             self.Loaded = False
-            self.Approaching = False
+            self.Approaching = Signal.NONE
             self.ApproachStop = False
             self.Stopped = True
 
@@ -46,6 +47,7 @@ class State:
             self.InvertCamera = False
             self.NoImageTransfer = False
             self.RecordImage = False
+            self.MeasureMode = False
 
             self.ThreadSleepingThreshold = 0.1
 
@@ -64,11 +66,13 @@ class State:
 
         def captureLapSignal(self):
             if (not self.LastLapSignalTimeStamp):
-                self.LastLapSignalTimeStamp = time.now()
+                self.LastLapSignalTimeStamp = datetime.timestamp(
+                    datetime.now())
 
             # if seen lap signal within 5 seconds again, dont count it as a new lap
-            if ((self.LastLapSignalTimeStamp + self.LapSignalTimeThreshold) <= time.now()):
-                self.LastLapSignalTimeStamp = time.now()
+            if ((self.LastLapSignalTimeStamp + self.LapSignalTimeThreshold) <= datetime.timestamp(datetime.now())):
+                self.LastLapSignalTimeStamp = datetime.timestamp(
+                    datetime.now())
                 self.LapSignalCount += 1
 
         def setStopSignal(self, num):

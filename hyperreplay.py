@@ -1,6 +1,6 @@
 from lib.camera import Camera
 from lib.logger import Logger
-from lib.state import State
+from lib.state import State, Signal
 
 import os
 import cv2
@@ -35,8 +35,11 @@ def hyperloop():
             imageFolder = p
         elif (p != "" and p.isdigit()):
             imageNum = int(p)
+        elif (p != "" and p == "-l"):
+            state.Approaching = Signal.LAP
 
-    state.setStopSignal(1)
+    if (state.Approaching != Signal.LAP):
+        state.setStopSignal(1)
 
     camera = Camera(None, True)
 

@@ -24,7 +24,6 @@ class Colors:
     Here are different color ranges defined for creating a bit mask of the image.
 
     """
-
     # define color boundaries
     lower_white_color = np.array([0, 15, 0])
     upper_white_color = np.array([180, 90, 255])
@@ -32,8 +31,8 @@ class Colors:
     lower_black_hsv = np.array([0, 0, 0])
     upper_black_hsv = np.array([180, 255, 60])
 
-    lower_blue_color = np.array([94, 80, 2])
-    upper_blue_color = np.array([126, 255, 255])
+    lower_blue_color = np.array([90, 180, 100])
+    upper_blue_color = np.array([130, 255, 255])
 
 
 class Camera:
@@ -49,13 +48,14 @@ class Camera:
         def __init__(self, vs, imgOutput):
             self.__vs = vs
             self.__imgOutput = imgOutput
+            self.image = None
             self.logger = Logger()
             self.state = State()
             self.tesseract = PyTessBaseAPI(
                 psm=PSM.SINGLE_CHAR, oem=OEM.LSTM_ONLY, lang="digits")
             self.filter = Filter()
 
-            self.signalThresholdY = 150
+            self.signalThresholdY = 160
 
             self.recordStamp = time.strftime(self.logger.timeFormat)
             self.recordNum = 0
@@ -166,7 +166,7 @@ class Camera:
                     self.logger.info(
                         'Info Signal OCR: ' + output + ' X: ' + str(x) + ' Y: ' + str(y) + ' Confidence: ' + str(confidence[0]) + '%')  # + ' DC: ' + str(dominantColor))
                     self.state.setCurrentSignal(
-                        Signal.NUM, int(output))
+                        Signal.UPPER, int(output))
                     return 'I: ' + output
 
         def getAmountOfColor(self, img, lowerColor, upperColor, convert2hsv=True):
@@ -182,20 +182,72 @@ class Camera:
         # color picker for manual debugging
         def pick_color(self, event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN:
-                pixel = image[y, x]
+                pixel = self.image[y, x]
                 color = np.array([pixel[0], pixel[1], pixel[2]])
-                self.logger.info(color)
+                self.logger.info(pixel)
 
         # capture frames from the camera
         def capture(self, savedImg=None):
-            global image
-
             if (savedImg is not None):
                 image = savedImg
             else:
                 image = self.__vs.read()
                 if (self.state.InvertCamera):
                     image = imutils.rotate(image, angle=180)
+
+            self.image = image
+
+            if (self.state.RecordImage):
+                self.recordNum += 1
+                cv2.imwrite(os.path.join(self.recordFolder,
+                                         str(self.recordNum) + ".jpg"), image)
+                return
+
+            if (self.state.Approaching == Signal.UPPER or self.state.Approaching == Signal.LOWER):
+                self.findNumberSignal(image)
+            elif (self.state.Approaching == Signal.LAP):
+                self.findLapSignal(image)
+
+        def findLapSignal(self, image):
+            contourImage = image.copy()
+
+            blur = cv2.GaussianBlur(image, (3, 3), 0)
+            hsv = cv2.cvtColor(blur, cv2.COLOR_BGR2HSV)
+            self.image = hsv
+            mask = cv2.inRange(hsv, Colors.lower_blue_color,
+                               Colors.upper_blue_color)
+
+            cnts = imutils.grab_contours(cv2.findContours(
+                mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE))
+
+            if len(cnts) > 0:
+                rects = []
+                # loop contours
+                for self.cntNum, cnt in enumerate(cnts):
+                    rect = cv2.boundingRect(cnt)
+                    rects.append(rect)
+                    cv2.drawContours(contourImage, [cnt], -1, (0, 0, 255), 2)
+
+                for rect in rects:
+                    (x, y, w, h) = rect
+                    # pattern matching
+                    counterPart = [counterRect for counterRect in rects if (
+                        counterRect != rect and
+                        x - 5 <= counterRect[0] <= x + 5 and
+                        y + h <= counterRect[1] and
+                        w - 5 <= counterRect[2] <= w + 5) and
+                        h - 5 <= counterRect[3] <= h + 5]
+
+                    if (counterPart):
+                        self.logger.info('LAP Signal')
+                        self.state.captureLapSignal()
+                        break
+
+            self.showImg('contourImage', np.hstack(
+                (hsv, contourImage, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))))
+            cv2.setMouseCallback('contourImage', self.pick_color)
+
+        def findNumberSignal(self, image):
 
             image_height = np.size(image, 0)
             image_width = np.size(image, 1)
@@ -240,7 +292,7 @@ class Camera:
                             continue
 
                         # we are in approaching mode, thus we only care for the lower signals <= threshold
-                        if ((self.state.Approaching and y <= self.signalThresholdY) and not self.state.Standalone):
+                        if ((self.state.Approaching == Signal.UPPER and y >= self.signalThresholdY) and not self.state.Standalone):
                             continue
 
                         sideRatio = w / float(h)
@@ -321,11 +373,6 @@ class Camera:
 
             self.showImg("contourImage", np.hstack(
                 (contourImage, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR))))
-
-            if (self.state.RecordImage):
-                self.recordNum += 1
-                cv2.imwrite(os.path.join(self.recordFolder,
-                                         str(self.recordNum) + ".jpg"), image)
 
     # Singleton
     __inst = None

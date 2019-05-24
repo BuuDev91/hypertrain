@@ -101,14 +101,12 @@ class Communication:
 
         def read(self):
             if (self.serial.in_waiting > 0):
-                time.sleep(0.1)
                 while self.serial.inWaiting():
                     self.buffer += self.serial.read(self.serial.inWaiting()
                                                     ).decode('ascii')
 
                 for incoming in self.extractJSONObjects(self.buffer):
-                    if incoming:
-                        self.parse(incoming)
+                    self.parse(str(incoming).replace("'", '"'))
 
         def write(self, message):
             if (message):
@@ -128,11 +126,13 @@ class Communication:
                     if (jsonObj["action"] == "speed"):
                         return
                     if (jsonObj["action"] == "way" and jsonObj["payload"]):
+                        self.logger.debug("Way: " + message)
+
                         self.state.CoveredDistance = int(
                             jsonObj["payload"])
                         return
 
-                self.logger.info("Receiving: " + message)
+                self.logger.debug("Receiving: " + message)
 
             except AttributeError as e:
                 self.logger.error(
