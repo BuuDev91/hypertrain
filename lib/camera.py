@@ -222,24 +222,26 @@ class Camera:
                 mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE))
 
             if len(cnts) > 0:
-                rects = []
-                # loop contours
-                for self.cntNum, cnt in enumerate(cnts):
-                    rect = cv2.boundingRect(cnt)
-                    rects.append(rect)
-                    cv2.drawContours(contourImage, [cnt], -1, (0, 0, 255), 2)
 
+                # transform all contours to rects
+                rects = [cv2.boundingRect(cnt) for cnt in cnts]
+
+                # now iterate all of the rects, trying to find an approximated sibiling shifted in Y-direction
                 for rect in rects:
                     (x, y, w, h) = rect
-                    # pattern matching
+                    cv2.rectangle(contourImage,(x,y),(x+w,y+h),(0,0,255),2)
+
+                    # try to match the pattern from a given rect in all rects
                     counterPart = [counterRect for counterRect in rects if (
                         counterRect != rect and
                         x - 5 <= counterRect[0] <= x + 5 and
-                        y + h <= counterRect[1] and
+                        2*-(h+5) <= y - counterRect[1] <= 2*(h+5) and
                         w - 5 <= counterRect[2] <= w + 5) and
                         h - 5 <= counterRect[3] <= h + 5]
 
                     if (counterPart):
+                        (x, y, w, h) = counterPart[0]
+                        cv2.rectangle(contourImage,(x,y),(x+w,y+h),(0,255,0),2)
                         self.logger.info('LAP Signal')
                         self.state.captureLapSignal()
                         break

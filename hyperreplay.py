@@ -31,12 +31,18 @@ def hyperloop():
 
     state = State()
     for p in sys.argv:
-        if (p != "" and os.path.isdir(p)):
+        if (os.path.isdir(p)):
             imageFolder = p
-        elif (p != "" and p.isdigit()):
+        elif (p.isdigit()):
             imageNum = int(p)
-        elif (p != "" and p == "-l"):
+        elif (p == "-lap"):
             state.Approaching = Signal.LAP
+        elif (p == "-up"):
+            state.Approaching = Signal.UPPER
+        elif (p == "-lo"):
+            state.Approaching = Signal.LOWER
+        elif (p == "-s"):
+            state.Approaching = Signal.UPPER
 
     if (state.Approaching != Signal.LAP):
         state.setStopSignal(1)
