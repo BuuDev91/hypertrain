@@ -66,13 +66,11 @@ class State:
 
         def captureLapSignal(self):
             if (not self.LastLapSignalTimeStamp):
-                self.LastLapSignalTimeStamp = datetime.timestamp(
-                    datetime.now())
+                self.LastLapSignalTimeStamp = time.time()
 
             # if seen lap signal within X seconds again, dont count it as a new lap
-            if ((self.LastLapSignalTimeStamp + self.LapSignalTimeThreshold) <= datetime.timestamp(datetime.now())):
-                self.LastLapSignalTimeStamp = datetime.timestamp(
-                    datetime.now())
+            if ((self.LastLapSignalTimeStamp + self.LapSignalTimeThreshold) <= time.time()):
+                self.LastLapSignalTimeStamp = time.time()
                 self.LapSignalCount += 1
 
         def setStopSignal(self, num):

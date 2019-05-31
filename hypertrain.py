@@ -79,8 +79,8 @@ def hyperloop():
                     state.setStopSignalAnnounced(True)
                     state.Approaching = Signal.LAP
                     logger.info("Approaching lap signal")
-                # if we covered the same distance again, we deccelerate to X percent
-                elif (state.StopSignalAnnounced and state.CoveredDistance >= 23*100 and not state.Approaching == Signal.LOWER):
+                # if we passed the lap signal twice, deccelerate to X percent
+                elif (state.StopSignalAnnounced and state.LapSignalCount >= 2 and not state.Approaching == Signal.LOWER):
                     communication.sendSpeedPercent(25)
                     state.Approaching = Signal.LOWER
                     logger.info("Approaching lower signal")

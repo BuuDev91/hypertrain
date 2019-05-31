@@ -102,8 +102,9 @@ class Communication:
         def read(self):
             if (self.serial.in_waiting > 0):
                 while self.serial.inWaiting():
-                    self.buffer += self.serial.read(self.serial.inWaiting()
-                                                    ).decode('ascii')
+                    asciiBytes = self.serial.read(self.serial.inWaiting())
+                    if (asciiBytes):
+                        self.buffer += asciiBytes.decode('ascii')
 
                 for incoming in self.extractJSONObjects(self.buffer):
                     self.parse(str(incoming).replace("'", '"'))

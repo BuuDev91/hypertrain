@@ -63,11 +63,11 @@ def hyperloop():
                 key = cv2.waitKey(0) & 0xFF
 
                 if key == ord("n"):
-                    cv2.destroyAllWindows()
+                    # cv2.destroyAllWindows()
                     if (imageNum + 1 < len(files)):
                         imageNum += 1
                 elif key == ord("b"):
-                    cv2.destroyAllWindows()
+                    # cv2.destroyAllWindows()
                     if (imageNum - 1 >= 0):
                         imageNum -= 1
                 elif key == ord('q'):
