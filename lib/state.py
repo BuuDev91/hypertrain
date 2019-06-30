@@ -49,7 +49,7 @@ class State:
             self.RecordImage = False
             self.MeasureMode = False
 
-            self.ThreadSleepingThreshold = 0.1
+            self.ThreadSleepingThreshold = 0.3
 
             # acceleration parameters
             self.x = 0

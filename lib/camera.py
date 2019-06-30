@@ -297,6 +297,8 @@ class Camera:
                         # we are in approaching mode, thus we only care for the lower signals <= threshold
                         if ((self.state.Approaching == Signal.UPPER and y >= self.signalThresholdY) and not self.state.Standalone):
                             continue
+                        elif ((self.state.Approaching == Signal.LOWER and y <= self.signalThresholdY) and not self.state.Standalone):
+                            continue
 
                         sideRatio = w / float(h)
 

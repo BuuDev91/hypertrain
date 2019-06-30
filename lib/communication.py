@@ -128,7 +128,6 @@ class Communication:
                         return
                     if (jsonObj["action"] == "way" and jsonObj["payload"]):
                         self.logger.debug("Way: " + message)
-
                         self.state.CoveredDistance = int(
                             jsonObj["payload"])
                         return
